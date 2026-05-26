@@ -9,7 +9,8 @@ const DEFAULTS = {
   min: 0,
   max: 100,
   majorStep: 10,
-  minorStep: 2,
+  subdivisions: 4,          // minor ticks between adjacent majors
+  reverse: false,           // swap min/max direction
   rim: true,
   rimThickness: 2,
   majorLen: 18,
@@ -20,6 +21,10 @@ const DEFAULTS = {
   numberSize: 18,
   numberOffset: 8,
   numberWeight: 400,
+  numberSuffix: '',
+  customLabels: '',
+  centerText: '',
+  centerTextSize: 28,
   tickColor: '#111111',
   bg: '#ffffff',
   // arc-specific
@@ -50,6 +55,8 @@ function clean(p) {
     out.tickColor = '#ffffff';
     out.bg = p.bg === 'transparent' ? 'transparent' : '#000000';
   }
+  // Derive the minor step from subdivisions count (minor ticks between adjacent majors)
+  out.minorStep = p.subdivisions > 0 ? p.majorStep / (p.subdivisions + 1) : 0;
   return out;
 }
 
@@ -98,6 +105,22 @@ function NumField({ label, value, step = 1, onChange }) {
           const n = Number(e.target.value);
           if (Number.isNaN(n)) onChange(0);
         }}
+      />
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange, placeholder = '' }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <input
+        className="num mono"
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ textAlign: 'left' }}
       />
     </div>
   );
@@ -285,7 +308,15 @@ export default function App() {
   const loadPreset = useCallback((name) => {
     const saved = presets[name];
     if (!saved) return;
-    setP({ ...DEFAULTS, ...saved });
+    const merged = { ...DEFAULTS, ...saved };
+    // Back-compat: presets saved before "subdivisions" had a minorStep field
+    if (saved.subdivisions === undefined && saved.minorStep !== undefined) {
+      merged.subdivisions = saved.minorStep > 0 && saved.majorStep > 0
+        ? Math.max(0, Math.round(saved.majorStep / saved.minorStep) - 1)
+        : 0;
+    }
+    delete merged.minorStep;
+    setP(merged);
   }, [presets]);
   const deletePreset = useCallback((name) => {
     if (!window.confirm(`Delete preset "${name}"?`)) return;
@@ -445,6 +476,11 @@ export default function App() {
               </div>
             </div>
           )}
+
+          <div className="row" style={{ marginTop: 10 }}>
+            <label>Reverse direction</label>
+            <Toggle checked={p.reverse} onChange={(v) => set('reverse', v)} />
+          </div>
         </Sec>
 
         <Sec title="Range">
@@ -462,11 +498,12 @@ export default function App() {
               onChange={(v) => set('majorStep', Math.max(0.0001, Number(v) || 0.0001))}
             />
             <NumField
-              label="Minor step"
-              value={p.minorStep} step={p.minorStep < 1 ? 0.1 : 1}
-              onChange={(v) => set('minorStep', Math.max(0, Number(v) || 0))}
+              label="Subdivisions"
+              value={p.subdivisions} step={1}
+              onChange={(v) => set('subdivisions', Math.max(0, Math.round(Number(v) || 0)))}
             />
           </div>
+          <p className="hint" style={{ marginTop: -2 }}>Subdivisions = minor ticks between adjacent majors. 0 hides them.</p>
           <Slider label="Major length" value={p.majorLen} min={2} max={60} step={1} onChange={(v) => set('majorLen', v)} suffix="px" />
           <Slider label="Minor length" value={p.minorLen} min={1} max={40} step={1} onChange={(v) => set('minorLen', v)} suffix="px" />
           <Slider label="Major weight" value={p.majorWeight} min={0.5} max={8} step={0.5} onChange={(v) => set('majorWeight', v)} suffix="px" />
@@ -493,9 +530,44 @@ export default function App() {
               <Slider label="Size" value={p.numberSize} min={6} max={48} step={1} onChange={(v) => set('numberSize', v)} suffix="px" />
               <Slider label="Offset" value={p.numberOffset} min={0} max={40} step={1} onChange={(v) => set('numberOffset', v)} suffix="px" />
               <Slider label="Weight" value={p.numberWeight} min={100} max={900} step={100} onChange={(v) => set('numberWeight', v)} />
+              <div className="grid-2" style={{ marginTop: 8 }}>
+                <TextField label="Suffix" value={p.numberSuffix} placeholder="° % mph" onChange={(v) => set('numberSuffix', v)} />
+              </div>
+              <div className="field" style={{ marginTop: 8 }}>
+                <label>Custom labels</label>
+                <input
+                  className="num mono"
+                  type="text"
+                  value={p.customLabels}
+                  placeholder="e.g. L, M, H"
+                  style={{ width: '100%', textAlign: 'left' }}
+                  onChange={(e) => set('customLabels', e.target.value)}
+                />
+              </div>
+              <p className="hint">Comma-separated, one per major tick. Leave an entry blank to keep the numeric value at that position.</p>
             </>
           )}
         </Sec>
+
+        {isArc && (
+          <Sec title="Title">
+            <div className="field">
+              <label>Center text</label>
+              <input
+                className="num mono"
+                type="text"
+                value={p.centerText}
+                placeholder="e.g. RPM × 1000"
+                style={{ width: '100%', textAlign: 'left' }}
+                onChange={(e) => set('centerText', e.target.value)}
+              />
+            </div>
+            {p.centerText && (
+              <Slider label="Size" value={p.centerTextSize} min={8} max={96} step={1} onChange={(v) => set('centerTextSize', v)} suffix="px" />
+            )}
+            <p className="hint">Rendered at the dial's pivot. For a semi-circle this sits at the bottom of the arc; for a full circle, the geometric centre.</p>
+          </Sec>
+        )}
 
         <Sec title="Canvas">
           <div className="grid-2">

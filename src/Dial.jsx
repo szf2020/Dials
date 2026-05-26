@@ -11,6 +11,17 @@ function fmtNum(v, digits = 2) {
   return s.replace(/\.?0+$/, '');
 }
 
+// Returns a (value, index) => string for the major tick label.
+// Custom labels override the numeric value; an empty entry falls back to numeric.
+function tickLabelFor(p) {
+  const labels = (p.customLabels || '').split(',').map((s) => s.trim());
+  const suffix = p.numberSuffix || '';
+  return (v, i) => {
+    if (i < labels.length && labels[i] !== '') return labels[i];
+    return fmtNum(v) + suffix;
+  };
+}
+
 export function buildTickValues(min, max, step) {
   const ticks = [];
   if (step <= 0) return ticks;
@@ -34,9 +45,11 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     showNumbers, numberSize, numberOffset, numberWeight,
     tickSide,
     orientation,
+    reverse,
   } = p;
 
   const pad = Math.max(36, majorLen + numberOffset + numberSize + 12);
+  const labelFor = tickLabelFor(p);
 
   const isV = orientation === 'vertical';
   const length = isV ? height - pad * 2 : width - pad * 2;
@@ -46,7 +59,8 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
   const axisY1 = isV ? height - pad : height / 2;
 
   const valueToPos = (v) => {
-    const t = (v - min) / (max - min);
+    const t0 = (v - min) / (max - min);
+    const t = reverse ? 1 - t0 : t0;
     if (isV) return { x: axisX1, y: axisY0 + t * length };
     return { x: axisX0 + t * length, y: axisY0 };
   };
@@ -112,7 +126,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
             dy={isV ? 0 : (side === 1 ? 2 : -2)}
             dx={isV ? 4 : 0}
           >
-            {fmtNum(v)}
+            {labelFor(v, i)}
           </text>
         );
       })}
@@ -210,11 +224,15 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     startAngle, sweepAngle,
     tickDirection,
     numberPlacement,
+    reverse,
+    centerText, centerTextSize,
   } = p;
 
+  const labelFor = tickLabelFor(p);
   const isFullCircle = Math.abs(sweepAngle) >= 360 - 0.001;
   const valueToAngle = (v) => {
-    const t = (v - min) / (max - min);
+    const t0 = (v - min) / (max - min);
+    const t = reverse ? 1 - t0 : t0;
     return startAngle + t * sweepAngle;
   };
   const polar = (angleDeg, radius) => {
@@ -289,10 +307,23 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
             textAnchor="middle"
             dominantBaseline="middle"
           >
-            {fmtNum(v)}
+            {labelFor(v, i)}
           </text>
         );
       })}
+      {centerText && (
+        <text
+          x={cx} y={cy}
+          fontFamily="Helvetica, Arial, sans-serif"
+          fontSize={centerTextSize}
+          fontWeight={500}
+          fill={tickColor}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          {centerText}
+        </text>
+      )}
     </g>
   );
 }
