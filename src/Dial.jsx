@@ -26,11 +26,19 @@ function tickLabelFor(p) {
 // browser. Picked well above any realistic dial; pathological values bail.
 const MAX_TICKS = 5000;
 
-// Renders a tick. When cornerPct is 0 we emit a <line> (same as before, so
-// the default look is byte-identical). When > 0 we emit a rotated <rect>
-// with an `rx` derived from `cornerPct / 100 * (weight / 2)`. The endpoints
-// stay where the line endpoints were, so spacing and length are unaffected.
-function renderTick({ x1, y1, x2, y2, weight, color, cornerPct, keyId }) {
+// Renders a tick. cornerPct === 0 keeps the original <line> (byte-identical
+// output, no path-rounding work). > 0 emits a rotated <path> so we can
+// selectively round only the outer tip while keeping the rim-side short
+// edge perfectly square — without that, with a thin rim the rounded end
+// pinches in before meeting the rim and leaves a visible gap.
+//
+// flatSide names the endpoint that should stay flat (square):
+//   'p1' — (x1,y1) is the rim-side end
+//   'p2' — (x2,y2) is the rim-side end
+//   'none' (default) — round both ends (used for straight ticks that
+//     cross the axis when tickSide === 'both', where neither end is the
+//     anchor).
+function renderTick({ x1, y1, x2, y2, weight, color, cornerPct, flatSide = 'none', keyId }) {
   if (!cornerPct || cornerPct <= 0) {
     return (
       <line
@@ -50,17 +58,48 @@ function renderTick({ x1, y1, x2, y2, weight, color, cornerPct, keyId }) {
   const cy = (y1 + y2) / 2;
   const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
   const rx = Math.min(weight / 2, (cornerPct / 100) * (weight / 2));
+  const halfLen = len / 2;
+  const halfW = weight / 2;
+  const roundP1 = flatSide !== 'p1';
+  const roundP2 = flatSide !== 'p2';
+  const hasStraightLong = rx < halfW;
+  const f = (n) => n.toFixed(3);
+
+  // Build a closed path in local coords (centred at origin, p1 at -halfLen,
+  // p2 at +halfLen). Then translate + rotate into world coords.
+  let d = roundP1
+    ? `M ${f(-halfLen + rx)} ${f(-halfW)} `
+    : `M ${f(-halfLen)} ${f(-halfW)} `;
+
+  // Top edge → p2 end.
+  if (roundP2) {
+    d += `L ${f(halfLen - rx)} ${f(-halfW)} `;
+    d += `A ${f(rx)} ${f(rx)} 0 0 1 ${f(halfLen)} ${f(-halfW + rx)} `;
+    if (hasStraightLong) d += `L ${f(halfLen)} ${f(halfW - rx)} `;
+    d += `A ${f(rx)} ${f(rx)} 0 0 1 ${f(halfLen - rx)} ${f(halfW)} `;
+  } else {
+    d += `L ${f(halfLen)} ${f(-halfW)} `;
+    d += `L ${f(halfLen)} ${f(halfW)} `;
+  }
+
+  // Bottom edge → p1 end.
+  if (roundP1) {
+    d += `L ${f(-halfLen + rx)} ${f(halfW)} `;
+    d += `A ${f(rx)} ${f(rx)} 0 0 1 ${f(-halfLen)} ${f(halfW - rx)} `;
+    if (hasStraightLong) d += `L ${f(-halfLen)} ${f(-halfW + rx)} `;
+    d += `A ${f(rx)} ${f(rx)} 0 0 1 ${f(-halfLen + rx)} ${f(-halfW)} `;
+  } else {
+    d += `L ${f(-halfLen)} ${f(halfW)} `;
+    d += `L ${f(-halfLen)} ${f(-halfW)} `;
+  }
+  d += 'Z';
+
   return (
-    <rect
+    <path
       key={keyId}
-      x={cx - len / 2}
-      y={cy - weight / 2}
-      width={len}
-      height={weight}
-      rx={rx}
-      ry={rx}
+      d={d}
       fill={color}
-      transform={`rotate(${angle} ${cx} ${cy})`}
+      transform={`translate(${f(cx)} ${f(cy)}) rotate(${f(angle)})`}
     />
   );
 }
@@ -130,23 +169,26 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
   const tickLine = (v, len, weight, key) => {
     const a = valueToPos(v);
     // With sides='both' AND rounded corners, draw one tick crossing the axis
-    // instead of two halves so the middle doesn't pinch.
+    // instead of two halves so the middle doesn't pinch. Neither end is the
+    // rim-side here (the rim is in the middle), so both ends are rounded.
     if (tickCornerRadius > 0 && tickSide === 'both') {
       const offPos = perp(len, 1);
       const offNeg = perp(len, -1);
       return renderTick({
         x1: a.x + offNeg.dx, y1: a.y + offNeg.dy,
         x2: a.x + offPos.dx, y2: a.y + offPos.dy,
-        weight, color: tickColor, cornerPct: tickCornerRadius, keyId: key,
+        weight, color: tickColor, cornerPct: tickCornerRadius, flatSide: 'none', keyId: key,
       });
     }
     return sides.map((s) => {
       const off = perp(len, s);
       const back = perp(rimExt, -s);
+      // p1 (back-extension end) sits at the rim — keep its short edge flat
+      // so the tick meets the rim line cleanly even with a thin rim.
       return renderTick({
         x1: a.x + back.dx, y1: a.y + back.dy,
         x2: a.x + off.dx, y2: a.y + off.dy,
-        weight, color: tickColor, cornerPct: tickCornerRadius, keyId: `${key}-${s}`,
+        weight, color: tickColor, cornerPct: tickCornerRadius, flatSide: 'p1', keyId: `${key}-${s}`,
       });
     });
   };
@@ -321,10 +363,15 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     const outer = tickDirection === 'inward' ? r + rimExt : r + len;
     const p1 = polar(a, inner);
     const p2 = polar(a, outer);
+    // For inward ticks p2 sits at the rim (inner tip = p1, away from rim).
+    // For outward ticks p1 sits at the rim (outer tip = p2, away from rim).
+    // The rim-side end gets the flat short edge so a thin rim doesn't show
+    // a gap between the tick and the rim line.
+    const flatSide = tickDirection === 'inward' ? 'p2' : 'p1';
     return renderTick({
       x1: p1.x, y1: p1.y,
       x2: p2.x, y2: p2.y,
-      weight, color: tickColor, cornerPct: tickCornerRadius, keyId: key,
+      weight, color: tickColor, cornerPct: tickCornerRadius, flatSide, keyId: key,
     });
   };
 
