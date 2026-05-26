@@ -64,4 +64,10 @@ If you fork this and want to deploy under a different repo name, change the `bas
 - Persisted storage:
   - `dialMaker.presets.v1` — saved presets (current dial config is intentionally **not** included; view state and presets stay separate).
   - `dialMaker.section.<id>` — open/closed state per sidebar section.
-- URL hash format: only fields that differ from `DEFAULTS`, written as short-key URL params via `URLSearchParams` (e.g. `#s=arc&sa=135&sw=270`). A default dial has no hash at all. Legacy base64-JSON hashes still decode for backward compatibility with older shared links. Values loaded from the hash (or from a preset) are sanitized — every numeric field is clamped to the same range its UI control allows.
+- URL hash format: only fields that differ from `DEFAULTS`, written as short-key URL params via `URLSearchParams` (e.g. `#s=arc&sa=135&sw=270`). A default dial has no hash at all. Legacy base64-JSON hashes still decode for backward compatibility with older shared links.
+- Any state loaded from the hash or a preset goes through a sanitizer before reaching the renderer:
+  - **Numbers** are coerced to finite values and clamped to the same range as the matching UI control. Non-finite values fall back to `DEFAULTS`.
+  - **Enum fields** (`shape`, `tickDirection`, `numberPlacement`, `orientation`, `tickSide`, `bg`) are checked against an allowlist; unknown values fall back.
+  - **`tickColor`** must match `^#[0-9a-f]{6}$`; anything else falls back.
+  - **Booleans** accept strict `true` / `false` only. The hash encoding is `1` / `0`; any other value leaves the field unset so `DEFAULTS` wins.
+  - **Free-form strings** (`numberSuffix`, `customLabels`, `centerText`) are type-checked and soft-capped at 32 / 1024 / 256 characters so a maliciously long hash can't stall the renderer.

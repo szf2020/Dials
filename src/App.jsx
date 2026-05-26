@@ -132,10 +132,11 @@ function sanitizeParams(p) {
     out.tickColor = DEFAULTS.tickColor;
   }
 
-  // Booleans: the hash decoder already converts '1'/'0' → true/false, but a
-  // hand-crafted preset could carry any value. Coerce defensively.
+  // Booleans: accept strict true/false only. !!val would turn truthy-looking
+  // strings like "false", "0", or "no" into true, so a hand-crafted preset
+  // could silently flip toggles. Fall back to DEFAULTS on anything else.
   for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot']) {
-    out[key] = !!out[key];
+    if (out[key] !== true && out[key] !== false) out[key] = DEFAULTS[key];
   }
 
   // Free-form strings: enforce type and a soft length cap so a giant URL
@@ -462,7 +463,10 @@ function decodeHashState(hash, defaults) {
       if (!fullKey) continue;
       const defaultVal = defaults[fullKey];
       if (typeof defaultVal === 'boolean') {
-        result[fullKey] = value === '1';
+        // Only the strict '1' / '0' encoding maps to a boolean; anything
+        // else stays unset so the DEFAULTS merge keeps the default value.
+        if (value === '1') result[fullKey] = true;
+        else if (value === '0') result[fullKey] = false;
       } else if (typeof defaultVal === 'number') {
         const n = Number(value);
         if (Number.isFinite(n)) result[fullKey] = n;
