@@ -77,11 +77,38 @@ function clean(p) {
   return out;
 }
 
-function Sec({ title, children }) {
+function Sec({ id, title, children, defaultOpen = true }) {
+  const storageKey = id ? `dialMaker.section.${id}` : null;
+  const [open, setOpen] = useState(() => {
+    if (!storageKey) return defaultOpen;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored === null ? defaultOpen : stored === '1';
+    } catch { return defaultOpen; }
+  });
+  const toggle = () => {
+    setOpen((o) => {
+      const next = !o;
+      if (storageKey) {
+        try { localStorage.setItem(storageKey, next ? '1' : '0'); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  };
   return (
-    <div className="section">
-      <h2>{title}</h2>
-      {children}
+    <div className={'section' + (open ? '' : ' collapsed')}>
+      <h2
+        className="section-head"
+        onClick={toggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+      >
+        <span className="chev" aria-hidden="true">▸</span>
+        {title}
+      </h2>
+      {open && <div className="section-body">{children}</div>}
     </div>
   );
 }
@@ -294,9 +321,48 @@ const ShapeIcon = {
   ),
 };
 
+// ---- URL state helpers ----
+// We round-trip the full `p` object through base64 in location.hash so a link
+// reproduces the exact dial config.
+function decodeHashState(hash) {
+  if (!hash) return null;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(hash)))));
+  } catch {
+    return null;
+  }
+}
+function encodeHashState(obj) {
+  return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(obj)))));
+}
+
 export default function App() {
-  const [p, setP] = useState(DEFAULTS);
+  const [p, setP] = useState(() => {
+    const fromHash = decodeHashState(window.location.hash.slice(1));
+    return fromHash ? { ...DEFAULTS, ...fromHash } : DEFAULTS;
+  });
   const svgWrapRef = useRef(null);
+
+  // Write p back into the URL hash (debounced) so sharing the URL shares the
+  // config. replaceState avoids spamming browser history.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        window.history.replaceState(null, '', '#' + encodeHashState(p));
+      } catch { /* ignore */ }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [p]);
+
+  // React to the URL hash changing externally (paste, back/forward).
+  useEffect(() => {
+    const onHashChange = () => {
+      const next = decodeHashState(window.location.hash.slice(1));
+      if (next) setP({ ...DEFAULTS, ...next });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const set = (k, v) => setP((prev) => ({ ...prev, [k]: v }));
   const setMany = (obj) => setP((prev) => ({ ...prev, ...obj }));
@@ -461,6 +527,27 @@ export default function App() {
   };
 
   // ---- Export ----
+  const [copyStatus, setCopyStatus] = useState('idle'); // idle | ok | error
+  const copyResetRef = useRef(null);
+  const copySVG = useCallback(async () => {
+    const live = svgWrapRef.current?.querySelector('svg');
+    if (!live) return;
+    const clone = live.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', params.width);
+    clone.setAttribute('height', params.height);
+    clone.removeAttribute('style');
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+    try {
+      await navigator.clipboard.writeText(xml);
+      setCopyStatus('ok');
+    } catch {
+      setCopyStatus('error');
+    }
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    copyResetRef.current = setTimeout(() => setCopyStatus('idle'), 1500);
+  }, [params]);
+
   const exportSVG = useCallback(() => {
     const live = svgWrapRef.current?.querySelector('svg');
     if (!live) return;
@@ -523,7 +610,7 @@ export default function App() {
           <span className="v mono">v1.0</span>
         </div>
 
-        <Sec title="Shape">
+        <Sec id="shape" title="Shape">
           <Seg
             icon
             options={[
@@ -613,14 +700,14 @@ export default function App() {
           </div>
         </Sec>
 
-        <Sec title="Range">
+        <Sec id="range" title="Range">
           <div className="grid-2">
             <NumField label="Min" value={p.min} onChange={(v) => set('min', v)} />
             <NumField label="Max" value={p.max} onChange={(v) => set('max', v)} />
           </div>
         </Sec>
 
-        <Sec title="Graduations">
+        <Sec id="graduations" title="Graduations">
           <div className="grid-2">
             <NumField
               label="Major step"
@@ -640,7 +727,7 @@ export default function App() {
           <Slider label="Minor weight" value={p.minorWeight} min={0.25} max={5} step={0.25} onChange={(v) => set('minorWeight', v)} suffix="px" />
         </Sec>
 
-        <Sec title="Rim">
+        <Sec id="rim" title="Rim">
           <div className="row">
             <label>Rim</label>
             <Toggle checked={p.rim} onChange={(v) => set('rim', v)} />
@@ -650,7 +737,7 @@ export default function App() {
           )}
         </Sec>
 
-        <Sec title="Numbers">
+        <Sec id="numbers" title="Numbers">
           <div className="row">
             <label>Show numbers</label>
             <Toggle checked={p.showNumbers} onChange={(v) => set('showNumbers', v)} />
@@ -680,7 +767,7 @@ export default function App() {
         </Sec>
 
         {isArc && (
-          <Sec title="Center">
+          <Sec id="center" title="Center">
             <div className="row">
               <label>Hub dot</label>
               <Toggle checked={p.centerDot} onChange={(v) => set('centerDot', v)} />
@@ -711,10 +798,22 @@ export default function App() {
           </Sec>
         )}
 
-        <Sec title="Canvas">
+        <Sec id="canvas" title="Canvas">
           <div className="grid-2">
             <NumField label="Width"  value={p.width}  onChange={(v) => set('width',  Math.max(80, Number(v) || 80))} />
             <NumField label="Height" value={p.height} onChange={(v) => set('height', Math.max(80, Number(v) || 80))} />
+          </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <label>Texture size</label>
+            <Seg
+              options={[
+                { value: 512,  label: '512' },
+                { value: 1024, label: '1024' },
+                { value: 2048, label: '2048' },
+              ]}
+              value={p.width === p.height ? p.width : null}
+              onChange={(n) => setMany({ width: n, height: n })}
+            />
           </div>
           <div className="row" style={{ marginTop: 10 }}>
             <label>Background</label>
@@ -733,7 +832,7 @@ export default function App() {
           </div>
         </Sec>
 
-        <Sec title="Presets">
+        <Sec id="presets" title="Presets" defaultOpen={false}>
           {presetNames.length === 0 ? (
             <div className="preset-empty">No saved presets yet.</div>
           ) : (
@@ -753,6 +852,11 @@ export default function App() {
           <div className="btn-row">
             <button className="btn" onClick={exportSVG}>Download SVG</button>
             <button className="btn alt" onClick={exportPNG}>Download PNG</button>
+          </div>
+          <div className="btn-row" style={{ marginTop: 8 }}>
+            <button className="btn alt" onClick={copySVG} style={{ gridColumn: '1 / -1' }}>
+              {copyStatus === 'ok' ? 'Copied!' : copyStatus === 'error' ? 'Copy failed' : 'Copy SVG to clipboard'}
+            </button>
           </div>
           <div className="btn-row" style={{ marginTop: 8 }}>
             <button className="btn alt" onClick={reset} style={{ gridColumn: '1 / -1' }}>Reset to defaults</button>
