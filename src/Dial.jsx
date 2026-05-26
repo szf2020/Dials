@@ -53,7 +53,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
 
   const isV = orientation === 'vertical';
   const length = isV ? height - pad * 2 : width - pad * 2;
-  const axisX0 = pad;
+  const axisX0 = isV ? width / 2 : pad;
   const axisY0 = isV ? pad : height / 2;
   const axisX1 = isV ? width / 2 : width - pad;
   const axisY1 = isV ? height - pad : height / 2;
