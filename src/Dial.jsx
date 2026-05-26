@@ -233,7 +233,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     tickDirection,
     numberPlacement,
     reverse,
-    centerText, centerTextSize, centerTextWeight,
+    centerText, centerTextSize, centerTextWeight, centerTextOffset,
     centerDot, centerDotSize,
   } = p;
 
@@ -325,7 +325,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
       )}
       {centerText && (
         <text
-          x={cx} y={cy}
+          x={cx} y={cy + (centerTextOffset || 0)}
           fontFamily="Helvetica, Arial, sans-serif"
           fontSize={centerTextSize}
           fontWeight={centerTextWeight}
