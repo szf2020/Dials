@@ -1,4 +1,7 @@
+node_modules/
+dist/
 .claude/
+.vite/
 .DS_Store
 Thumbs.db
-node_modules/
+*.log

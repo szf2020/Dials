@@ -4,16 +4,17 @@
 <meta charset="utf-8" />
 <title>Dials</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="styles.css" />
+<meta name="description" content="Dials — a small browser tool for generating clean, black-and-white dial scale graphics (straight, semi-circle, custom arc, or full circle) with configurable graduations, rim, and numbering. Exports SVG and 2× PNG." />
+<meta name="theme-color" content="#f4f3ef" />
 </head>
 <body>
 <div id="root"></div>
-
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-
-<script type="text/babel" data-presets="react" src="dial.jsx"></script>
-<script type="text/babel" data-presets="react" src="app.jsx"></script>
+<noscript>
+  <div style="font-family:Helvetica,Arial,sans-serif;padding:32px;max-width:560px;margin:48px auto;border:1px solid #e3e1db;background:#fff;color:#111;line-height:1.5;">
+    <h1 style="font-size:14px;letter-spacing:0.04em;margin:0 0 8px;text-transform:uppercase;">Dials</h1>
+    <p style="margin:0;font-size:13px;">This tool needs JavaScript to run. Enable JavaScript in your browser and reload the page.</p>
+  </div>
+</noscript>
+<script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

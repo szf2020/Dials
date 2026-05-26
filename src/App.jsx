@@ -1,10 +1,9 @@
-/* global React, ReactDOM, Dial */
-
-const { useState, useMemo, useRef, useCallback } = React;
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import Dial from './Dial.jsx';
 
 // ---- Initial params ----
 const DEFAULTS = {
-  shape: "semi",            // straight | semi | circle | arc
+  shape: 'semi',            // straight | semi | circle | arc
   width: 600,
   height: 600,
   min: 0,
@@ -21,36 +20,35 @@ const DEFAULTS = {
   numberSize: 18,
   numberOffset: 8,
   numberWeight: 400,
-  tickColor: "#111111",
-  bg: "#ffffff",
+  tickColor: '#111111',
+  bg: '#ffffff',
   // arc-specific
   startAngle: 180,
   sweepAngle: 180,
-  tickDirection: "inward",  // inward | outward
-  numberPlacement: "inside",// inside | outside
+  tickDirection: 'inward',  // inward | outward
+  numberPlacement: 'inside',// inside | outside
   invert: false,            // white on black
   // straight-specific
-  orientation: "horizontal",
-  tickSide: "below",        // below | above | both
+  orientation: 'horizontal',
+  tickSide: 'below',        // below | above | both
 };
 
 // Preset shape configs
 const SHAPE_PRESETS = {
-  straight: { shape: "straight", width: 800, height: 220 },
-  semi:     { shape: "semi", width: 600, height: 380, startAngle: 180, sweepAngle: 180 },
-  quarter:  { shape: "arc", width: 480, height: 480, startAngle: 180, sweepAngle: 90 },
-  arc270:   { shape: "arc", width: 560, height: 560, startAngle: 135, sweepAngle: 270 },
-  circle:   { shape: "circle", width: 560, height: 560, startAngle: -90, sweepAngle: 360 },
+  straight: { shape: 'straight', width: 800, height: 220 },
+  semi:     { shape: 'semi', width: 600, height: 380, startAngle: 180, sweepAngle: 180 },
+  quarter:  { shape: 'arc', width: 480, height: 480, startAngle: 180, sweepAngle: 90 },
+  arc270:   { shape: 'arc', width: 560, height: 560, startAngle: 135, sweepAngle: 270 },
+  circle:   { shape: 'circle', width: 560, height: 560, startAngle: -90, sweepAngle: 360 },
 };
 
 function clean(p) {
-  // Normalize: for "circle"/"semi" sub-shapes, render as arc internally
   const out = { ...p };
-  if (p.shape === "circle") { out.startAngle = -90; out.sweepAngle = 360; }
-  if (p.shape === "semi")   { out.sweepAngle = 180; }
+  if (p.shape === 'circle') { out.startAngle = -90; out.sweepAngle = 360; }
+  if (p.shape === 'semi')   { out.sweepAngle = 180; }
   if (p.invert) {
-    out.tickColor = "#ffffff";
-    out.bg = p.bg === "transparent" ? "transparent" : "#000000";
+    out.tickColor = '#ffffff';
+    out.bg = p.bg === 'transparent' ? 'transparent' : '#000000';
   }
   return out;
 }
@@ -64,7 +62,7 @@ function Sec({ title, children }) {
   );
 }
 
-function Slider({ label, value, min, max, step, onChange, suffix = "" }) {
+function Slider({ label, value, min, max, step, onChange, suffix = '' }) {
   return (
     <div className="slider-row">
       <div className="slider-head">
@@ -92,7 +90,7 @@ function NumField({ label, value, step = 1, onChange }) {
         step={step}
         onChange={(e) => {
           const v = e.target.value;
-          if (v === "" || v === "-") { onChange(v); return; }
+          if (v === '' || v === '-') { onChange(v); return; }
           const n = Number(v);
           if (!Number.isNaN(n)) onChange(n);
         }}
@@ -107,11 +105,11 @@ function NumField({ label, value, step = 1, onChange }) {
 
 function Seg({ options, value, onChange, icon = false }) {
   return (
-    <div className={"seg" + (icon ? " icon" : "")}>
+    <div className={'seg' + (icon ? ' icon' : '')}>
       {options.map((o) => (
         <button
           key={o.value}
-          className={value === o.value ? "on" : ""}
+          className={value === o.value ? 'on' : ''}
           onClick={() => onChange(o.value)}
           title={o.title || o.label}
         >
@@ -137,42 +135,42 @@ function Toggle({ checked, onChange }) {
 const ShapeIcon = {
   straight: (on) => (
     <svg width="36" height="20" viewBox="0 0 36 20" fill="none">
-      <line x1="4" y1="10" x2="32" y2="10" stroke={on ? "#fff" : "#111"} strokeWidth="1.4" />
+      <line x1="4" y1="10" x2="32" y2="10" stroke={on ? '#fff' : '#111'} strokeWidth="1.4" />
       {[6,11,16,21,26,31].map((x,i)=>(
-        <line key={i} x1={x} y1="10" x2={x} y2={i%2===0?"15":"13"} stroke={on?"#fff":"#111"} strokeWidth="1.2" />
+        <line key={i} x1={x} y1="10" x2={x} y2={i%2===0?'15':'13'} stroke={on?'#fff':'#111'} strokeWidth="1.2" />
       ))}
     </svg>
   ),
   semi: (on) => (
     <svg width="36" height="20" viewBox="0 0 36 20" fill="none">
-      <path d="M 5 16 A 13 13 0 0 1 31 16" stroke={on?"#fff":"#111"} strokeWidth="1.4" fill="none" />
+      <path d="M 5 16 A 13 13 0 0 1 31 16" stroke={on?'#fff':'#111'} strokeWidth="1.4" fill="none" />
       {[0,30,60,90,120,150,180].map((deg,i)=>{
         const rad=(180+deg)*Math.PI/180;
         const x1=18+Math.cos(rad)*13, y1=16+Math.sin(rad)*13;
         const x2=18+Math.cos(rad)*(13-3), y2=16+Math.sin(rad)*(13-3);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={on?"#fff":"#111"} strokeWidth="1.1" />;
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={on?'#fff':'#111'} strokeWidth="1.1" />;
       })}
     </svg>
   ),
   arc: (on) => (
     <svg width="36" height="20" viewBox="0 0 36 20" fill="none">
-      <path d="M 7 17 A 12 12 0 1 1 29 17" stroke={on?"#fff":"#111"} strokeWidth="1.4" fill="none" />
+      <path d="M 7 17 A 12 12 0 1 1 29 17" stroke={on?'#fff':'#111'} strokeWidth="1.4" fill="none" />
     </svg>
   ),
   circle: (on) => (
     <svg width="36" height="20" viewBox="0 0 36 20" fill="none">
-      <circle cx="18" cy="10" r="8" stroke={on?"#fff":"#111"} strokeWidth="1.4" fill="none" />
+      <circle cx="18" cy="10" r="8" stroke={on?'#fff':'#111'} strokeWidth="1.4" fill="none" />
       {[0,45,90,135,180,225,270,315].map((deg,i)=>{
         const rad=deg*Math.PI/180;
         const x1=18+Math.cos(rad)*8, y1=10+Math.sin(rad)*8;
         const x2=18+Math.cos(rad)*(8-2.5), y2=10+Math.sin(rad)*(8-2.5);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={on?"#fff":"#111"} strokeWidth="1.1" />;
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={on?'#fff':'#111'} strokeWidth="1.1" />;
       })}
     </svg>
   ),
 };
 
-function App() {
+export default function App() {
   const [p, setP] = useState(DEFAULTS);
   const svgWrapRef = useRef(null);
 
@@ -182,7 +180,7 @@ function App() {
   const params = useMemo(() => clean(p), [p]);
 
   const shape = p.shape;
-  const isArc = shape !== "straight";
+  const isArc = shape !== 'straight';
 
   // ---- Zoom / pan ----
   const [zoom, setZoom] = useState(1);
@@ -217,8 +215,7 @@ function App() {
 
   const onStageMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
-    // Don't start a pan when clicking on the zoom controls
-    if (e.target.closest(".zoom-ctl")) return;
+    if (e.target.closest('.zoom-ctl')) return;
     dragRef.current = {
       startX: e.clientX, startY: e.clientY,
       panX: 0, panY: 0,
@@ -230,9 +227,9 @@ function App() {
 
   // Mirror pan into a ref so the global mousemove handler reads fresh values
   const panRef = useRef(pan);
-  React.useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { panRef.current = pan; }, [pan]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const onMove = (ev) => {
       if (!dragRef.current) return;
       if (!dragRef.current._initialized) {
@@ -251,11 +248,11 @@ function App() {
         setIsDragging(false);
       }
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
     };
   }, []);
 
@@ -268,7 +265,7 @@ function App() {
   const zoomedOrPanned = zoom !== 1 || pan.x !== 0 || pan.y !== 0;
 
   // ---- Presets ----
-  const PRESET_KEY = "dialMaker.presets.v1";
+  const PRESET_KEY = 'dialMaker.presets.v1';
   const [presets, setPresets] = useState(() => {
     try {
       const raw = localStorage.getItem(PRESET_KEY);
@@ -277,10 +274,10 @@ function App() {
   });
   const persistPresets = useCallback((next) => {
     setPresets(next);
-    try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch {}
+    try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   }, []);
   const savePreset = useCallback(() => {
-    const name = (window.prompt("Preset name") || "").trim();
+    const name = (window.prompt('Preset name') || '').trim();
     if (!name) return;
     if (presets[name] && !window.confirm(`Overwrite preset "${name}"?`)) return;
     persistPresets({ ...presets, [name]: p });
@@ -288,7 +285,6 @@ function App() {
   const loadPreset = useCallback((name) => {
     const saved = presets[name];
     if (!saved) return;
-    // Merge with DEFAULTS so older presets pick up any new fields
     setP({ ...DEFAULTS, ...saved });
   }, [presets]);
   const deletePreset = useCallback((name) => {
@@ -297,67 +293,67 @@ function App() {
     delete next[name];
     persistPresets(next);
   }, [presets, persistPresets]);
-  const presetNames = useMemo(() => Object.keys(presets).sort((a, b) => a.localeCompare(b)), [presets]);
+  const presetNames = useMemo(
+    () => Object.keys(presets).sort((a, b) => a.localeCompare(b)),
+    [presets],
+  );
 
-  // Set shape (apply sensible preset for dimensions/angles)
   const onShape = (s) => {
-    const preset = SHAPE_PRESETS[s === "arc" ? "arc270" : s] || {};
-    setMany({
-      ...preset,
-      shape: s,
-    });
+    const preset = SHAPE_PRESETS[s === 'arc' ? 'arc270' : s] || {};
+    setMany({ ...preset, shape: s });
   };
 
   // ---- Export ----
   const exportSVG = useCallback(() => {
-    // Render a fresh, asExport SVG via ReactDOMServer? We don't have it. Just clone the live SVG.
-    const live = svgWrapRef.current?.querySelector("svg");
+    const live = svgWrapRef.current?.querySelector('svg');
     if (!live) return;
     const clone = live.cloneNode(true);
-    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", params.width);
-    clone.setAttribute("height", params.height);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', params.width);
+    clone.setAttribute('height', params.height);
+    clone.removeAttribute('style');
     const xml = new XMLSerializer().serializeToString(clone);
-    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + xml], { type: "image/svg+xml" });
+    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + xml], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url; a.download = `dial-${params.shape}.svg`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [params]);
 
   const exportPNG = useCallback(() => {
-    const live = svgWrapRef.current?.querySelector("svg");
+    const live = svgWrapRef.current?.querySelector('svg');
     if (!live) return;
     const clone = live.cloneNode(true);
-    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", params.width);
-    clone.setAttribute("height", params.height);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', params.width);
+    clone.setAttribute('height', params.height);
+    clone.removeAttribute('style');
     const xml = new XMLSerializer().serializeToString(clone);
     const svg64 = btoa(unescape(encodeURIComponent('<?xml version="1.0" encoding="UTF-8"?>\n' + xml)));
     const img = new Image();
     img.onload = () => {
-      const scale = 2; // export at 2x
-      const cnv = document.createElement("canvas");
+      const scale = 2;
+      const cnv = document.createElement('canvas');
       cnv.width = params.width * scale;
       cnv.height = params.height * scale;
-      const ctx = cnv.getContext("2d");
-      if (params.bg === "transparent") {
+      const ctx = cnv.getContext('2d');
+      if (params.bg === 'transparent') {
         ctx.clearRect(0, 0, cnv.width, cnv.height);
       } else {
-        ctx.fillStyle = params.bg || "#ffffff";
+        ctx.fillStyle = params.bg || '#ffffff';
         ctx.fillRect(0, 0, cnv.width, cnv.height);
       }
       ctx.drawImage(img, 0, 0, cnv.width, cnv.height);
       cnv.toBlob((b) => {
         const url = URL.createObjectURL(b);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url; a.download = `dial-${params.shape}@2x.png`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }, "image/png");
+      }, 'image/png');
     };
-    img.src = "data:image/svg+xml;base64," + svg64;
+    img.src = 'data:image/svg+xml;base64,' + svg64;
   }, [params]);
 
   const reset = () => setP(DEFAULTS);
@@ -374,51 +370,51 @@ function App() {
           <Seg
             icon
             options={[
-              { value: "straight", label: "Line",  render: ShapeIcon.straight, title: "Straight line" },
-              { value: "semi",     label: "Semi",  render: ShapeIcon.semi,     title: "Semi-circle" },
-              { value: "arc",      label: "Arc",   render: ShapeIcon.arc,      title: "Custom arc" },
-              { value: "circle",   label: "Round", render: ShapeIcon.circle,   title: "Full circle" },
+              { value: 'straight', label: 'Line',  render: ShapeIcon.straight, title: 'Straight line' },
+              { value: 'semi',     label: 'Semi',  render: ShapeIcon.semi,     title: 'Semi-circle' },
+              { value: 'arc',      label: 'Arc',   render: ShapeIcon.arc,      title: 'Custom arc' },
+              { value: 'circle',   label: 'Round', render: ShapeIcon.circle,   title: 'Full circle' },
             ]}
             value={shape}
             onChange={onShape}
           />
 
-          {shape === "straight" && (
+          {shape === 'straight' && (
             <div style={{ marginTop: 12 }}>
               <div className="row">
                 <label>Orientation</label>
                 <Seg
-                  options={[{ value: "horizontal", label: "Horiz." }, { value: "vertical", label: "Vert." }]}
+                  options={[{ value: 'horizontal', label: 'Horiz.' }, { value: 'vertical', label: 'Vert.' }]}
                   value={p.orientation}
-                  onChange={(v) => set("orientation", v)}
+                  onChange={(v) => set('orientation', v)}
                 />
               </div>
               <div className="row" style={{ marginTop: 8 }}>
                 <label>Tick side</label>
                 <Seg
                   options={[
-                    { value: "below", label: p.orientation === "vertical" ? "Right" : "Below" },
-                    { value: "above", label: p.orientation === "vertical" ? "Left" : "Above" },
-                    { value: "both",  label: "Both" },
+                    { value: 'below', label: p.orientation === 'vertical' ? 'Right' : 'Below' },
+                    { value: 'above', label: p.orientation === 'vertical' ? 'Left' : 'Above' },
+                    { value: 'both',  label: 'Both' },
                   ]}
                   value={p.tickSide}
-                  onChange={(v) => set("tickSide", v)}
+                  onChange={(v) => set('tickSide', v)}
                 />
               </div>
             </div>
           )}
 
-          {shape === "arc" && (
+          {shape === 'arc' && (
             <div style={{ marginTop: 12 }}>
               <Slider
                 label="Start angle" suffix="°"
                 value={p.startAngle} min={-180} max={360} step={1}
-                onChange={(v) => set("startAngle", v)}
+                onChange={(v) => set('startAngle', v)}
               />
               <Slider
                 label="Sweep" suffix="°"
                 value={p.sweepAngle} min={30} max={360} step={1}
-                onChange={(v) => set("sweepAngle", v)}
+                onChange={(v) => set('sweepAngle', v)}
               />
             </div>
           )}
@@ -429,22 +425,22 @@ function App() {
                 <label>Ticks</label>
                 <Seg
                   options={[
-                    { value: "inward", label: "Inward" },
-                    { value: "outward", label: "Outward" },
+                    { value: 'inward', label: 'Inward' },
+                    { value: 'outward', label: 'Outward' },
                   ]}
                   value={p.tickDirection}
-                  onChange={(v) => set("tickDirection", v)}
+                  onChange={(v) => set('tickDirection', v)}
                 />
               </div>
               <div className="row">
                 <label>Numbers</label>
                 <Seg
                   options={[
-                    { value: "inside", label: "Inside" },
-                    { value: "outside", label: "Outside" },
+                    { value: 'inside', label: 'Inside' },
+                    { value: 'outside', label: 'Outside' },
                   ]}
                   value={p.numberPlacement}
-                  onChange={(v) => set("numberPlacement", v)}
+                  onChange={(v) => set('numberPlacement', v)}
                 />
               </div>
             </div>
@@ -453,8 +449,8 @@ function App() {
 
         <Sec title="Range">
           <div className="grid-2">
-            <NumField label="Min" value={p.min} onChange={(v) => set("min", v)} />
-            <NumField label="Max" value={p.max} onChange={(v) => set("max", v)} />
+            <NumField label="Min" value={p.min} onChange={(v) => set('min', v)} />
+            <NumField label="Max" value={p.max} onChange={(v) => set('max', v)} />
           </div>
         </Sec>
 
@@ -463,63 +459,63 @@ function App() {
             <NumField
               label="Major step"
               value={p.majorStep} step={p.majorStep < 1 ? 0.1 : 1}
-              onChange={(v) => set("majorStep", Math.max(0.0001, Number(v) || 0.0001))}
+              onChange={(v) => set('majorStep', Math.max(0.0001, Number(v) || 0.0001))}
             />
             <NumField
               label="Minor step"
               value={p.minorStep} step={p.minorStep < 1 ? 0.1 : 1}
-              onChange={(v) => set("minorStep", Math.max(0, Number(v) || 0))}
+              onChange={(v) => set('minorStep', Math.max(0, Number(v) || 0))}
             />
           </div>
-          <Slider label="Major length" value={p.majorLen} min={2} max={60} step={1} onChange={(v) => set("majorLen", v)} suffix="px" />
-          <Slider label="Minor length" value={p.minorLen} min={1} max={40} step={1} onChange={(v) => set("minorLen", v)} suffix="px" />
-          <Slider label="Major weight" value={p.majorWeight} min={0.5} max={8} step={0.5} onChange={(v) => set("majorWeight", v)} suffix="px" />
-          <Slider label="Minor weight" value={p.minorWeight} min={0.25} max={5} step={0.25} onChange={(v) => set("minorWeight", v)} suffix="px" />
+          <Slider label="Major length" value={p.majorLen} min={2} max={60} step={1} onChange={(v) => set('majorLen', v)} suffix="px" />
+          <Slider label="Minor length" value={p.minorLen} min={1} max={40} step={1} onChange={(v) => set('minorLen', v)} suffix="px" />
+          <Slider label="Major weight" value={p.majorWeight} min={0.5} max={8} step={0.5} onChange={(v) => set('majorWeight', v)} suffix="px" />
+          <Slider label="Minor weight" value={p.minorWeight} min={0.25} max={5} step={0.25} onChange={(v) => set('minorWeight', v)} suffix="px" />
         </Sec>
 
         <Sec title="Rim">
           <div className="row">
             <label>Rim</label>
-            <Toggle checked={p.rim} onChange={(v) => set("rim", v)} />
+            <Toggle checked={p.rim} onChange={(v) => set('rim', v)} />
           </div>
           {p.rim && (
-            <Slider label="Thickness" value={p.rimThickness} min={0.5} max={12} step={0.5} onChange={(v) => set("rimThickness", v)} suffix="px" />
+            <Slider label="Thickness" value={p.rimThickness} min={0.5} max={12} step={0.5} onChange={(v) => set('rimThickness', v)} suffix="px" />
           )}
         </Sec>
 
         <Sec title="Numbers">
           <div className="row">
             <label>Show numbers</label>
-            <Toggle checked={p.showNumbers} onChange={(v) => set("showNumbers", v)} />
+            <Toggle checked={p.showNumbers} onChange={(v) => set('showNumbers', v)} />
           </div>
           {p.showNumbers && (
             <>
-              <Slider label="Size" value={p.numberSize} min={6} max={48} step={1} onChange={(v) => set("numberSize", v)} suffix="px" />
-              <Slider label="Offset" value={p.numberOffset} min={0} max={40} step={1} onChange={(v) => set("numberOffset", v)} suffix="px" />
-              <Slider label="Weight" value={p.numberWeight} min={100} max={900} step={100} onChange={(v) => set("numberWeight", v)} />
+              <Slider label="Size" value={p.numberSize} min={6} max={48} step={1} onChange={(v) => set('numberSize', v)} suffix="px" />
+              <Slider label="Offset" value={p.numberOffset} min={0} max={40} step={1} onChange={(v) => set('numberOffset', v)} suffix="px" />
+              <Slider label="Weight" value={p.numberWeight} min={100} max={900} step={100} onChange={(v) => set('numberWeight', v)} />
             </>
           )}
         </Sec>
 
         <Sec title="Canvas">
           <div className="grid-2">
-            <NumField label="Width"  value={p.width}  onChange={(v) => set("width",  Math.max(80, Number(v) || 80))} />
-            <NumField label="Height" value={p.height} onChange={(v) => set("height", Math.max(80, Number(v) || 80))} />
+            <NumField label="Width"  value={p.width}  onChange={(v) => set('width',  Math.max(80, Number(v) || 80))} />
+            <NumField label="Height" value={p.height} onChange={(v) => set('height', Math.max(80, Number(v) || 80))} />
           </div>
           <div className="row" style={{ marginTop: 10 }}>
             <label>Background</label>
             <Seg
               options={[
-                { value: "#ffffff", label: "White" },
-                { value: "transparent", label: "None" },
+                { value: '#ffffff', label: 'White' },
+                { value: 'transparent', label: 'None' },
               ]}
               value={p.bg}
-              onChange={(v) => set("bg", v)}
+              onChange={(v) => set('bg', v)}
             />
           </div>
           <div className="row" style={{ marginTop: 10 }}>
             <label>Invert (white on black)</label>
-            <Toggle checked={p.invert} onChange={(v) => set("invert", v)} />
+            <Toggle checked={p.invert} onChange={(v) => set('invert', v)} />
           </div>
         </Sec>
 
@@ -531,7 +527,7 @@ function App() {
               {presetNames.map((name) => (
                 <div key={name} className="preset-item">
                   <button className="preset-load" onClick={() => loadPreset(name)} title={`Load "${name}"`}>{name}</button>
-                  <button className="preset-del" onClick={() => deletePreset(name)} title={`Delete "${name}"`}>×</button>
+                  <button className="preset-del" onClick={() => deletePreset(name)} title={`Delete "${name}"`} aria-label={`Delete preset ${name}`}>×</button>
                 </div>
               ))}
             </div>
@@ -545,14 +541,14 @@ function App() {
             <button className="btn alt" onClick={exportPNG}>Download PNG</button>
           </div>
           <div className="btn-row" style={{ marginTop: 8 }}>
-            <button className="btn alt" onClick={reset} style={{ gridColumn: "1 / -1" }}>Reset to defaults</button>
+            <button className="btn alt" onClick={reset} style={{ gridColumn: '1 / -1' }}>Reset to defaults</button>
           </div>
           <p className="hint">PNG exports at 2× the canvas resolution. SVG is scalable and editable in any vector tool.</p>
         </div>
       </aside>
 
       <main
-        className={"stage" + (zoomedOrPanned ? " zoomed" : "") + (isDragging ? " dragging" : "")}
+        className={'stage' + (zoomedOrPanned ? ' zoomed' : '') + (isDragging ? ' dragging' : '')}
         ref={stageRef}
         onWheel={onWheel}
         onMouseDown={onStageMouseDown}
@@ -566,17 +562,15 @@ function App() {
         </div>
         <div className="stage-meta">
           <span className="dot" />
-          {params.width} × {params.height} · {shape === "straight" ? "straight" : shape === "circle" ? "circle" : shape === "semi" ? "semi-circle" : `arc ${params.sweepAngle}°`}
+          {params.width} × {params.height} · {shape === 'straight' ? 'straight' : shape === 'circle' ? 'circle' : shape === 'semi' ? 'semi-circle' : `arc ${params.sweepAngle}°`}
         </div>
         <div className="zoom-ctl" onMouseDown={(e) => e.stopPropagation()}>
-          <button onClick={() => applyZoom(zoomRef.current / 1.25)} title="Zoom out">−</button>
+          <button onClick={() => applyZoom(zoomRef.current / 1.25)} title="Zoom out" aria-label="Zoom out">−</button>
           <div className="zlbl">{Math.round(zoom * 100)}%</div>
-          <button onClick={() => applyZoom(zoomRef.current * 1.25)} title="Zoom in">+</button>
-          <button onClick={resetView} title="Reset view">Fit</button>
+          <button onClick={() => applyZoom(zoomRef.current * 1.25)} title="Zoom in" aria-label="Zoom in">+</button>
+          <button onClick={resetView} title="Reset view" aria-label="Reset view">Fit</button>
         </div>
       </main>
     </div>
   );
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
