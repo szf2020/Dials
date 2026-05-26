@@ -168,12 +168,15 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
 
   const tickLine = (v, len, weight, key) => {
     const a = valueToPos(v);
-    // With sides='both' AND rounded corners, draw one tick crossing the axis
-    // instead of two halves so the middle doesn't pinch. Neither end is the
-    // rim-side here (the rim is in the middle), so both ends are rounded.
+    // `len` is the visible tick length past the rim edge, so the tick tip
+    // sits at axis ± (rimExt + len). Otherwise a thicker rim would eat into
+    // the tick and shrink its visible portion.
     if (tickCornerRadius > 0 && tickSide === 'both') {
-      const offPos = perp(len, 1);
-      const offNeg = perp(len, -1);
+      // sides='both' with rounding: single shape crossing the axis. Both
+      // visible halves get `len` past the rim, so total length is
+      // 2*(rimExt + len).
+      const offPos = perp(rimExt + len, 1);
+      const offNeg = perp(rimExt + len, -1);
       return renderTick({
         x1: a.x + offNeg.dx, y1: a.y + offNeg.dy,
         x2: a.x + offPos.dx, y2: a.y + offPos.dy,
@@ -181,7 +184,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
       });
     }
     return sides.map((s) => {
-      const off = perp(len, s);
+      const off = perp(rimExt + len, s);
       const back = perp(rimExt, -s);
       // p1 (back-extension end) sits at the rim — keep its short edge flat
       // so the tick meets the rim line cleanly even with a thin rim.
@@ -211,7 +214,9 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
       {showNumbers && ticksMajor.map((v, i) => {
         const a = valueToPos(v);
         const side = tickSide === 'above' ? -1 : 1;
-        const off = perp(majorLen + numberOffset, side);
+        // Labels sit `numberOffset` past the tick tip, which itself is at
+        // (rimExt + majorLen) past the axis.
+        const off = perp(rimExt + majorLen + numberOffset, side);
         const tx = a.x + off.dx;
         const ty = a.y + off.dy;
         return (
@@ -359,8 +364,10 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
 
   const tickAt = (v, len, weight, key) => {
     const a = valueToAngle(v);
-    const inner = tickDirection === 'inward' ? r - len : r - rimExt;
-    const outer = tickDirection === 'inward' ? r + rimExt : r + len;
+    // `len` is the visible length past the rim edge. Tick crosses through
+    // the rim and extends `len` on the chosen side.
+    const inner = tickDirection === 'inward' ? r - rimExt - len : r - rimExt;
+    const outer = tickDirection === 'inward' ? r + rimExt : r + rimExt + len;
     const p1 = polar(a, inner);
     const p2 = polar(a, outer);
     // For inward ticks p2 sits at the rim (inner tip = p1, away from rim).
@@ -403,10 +410,12 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
       {showNumbers && ticksMajor.map((v, i) => {
         const a = valueToAngle(v);
         let rText;
+        // Labels sit `numberOffset` past whichever edge they're outside of:
+        // the rim itself, or the tick tip when the tick points the same way.
         if (numberPlacement === 'outside') {
-          rText = r + (tickDirection === 'outward' ? majorLen : 0) + numberOffset + numberSize * 0.55;
+          rText = r + rimExt + (tickDirection === 'outward' ? majorLen : 0) + numberOffset + numberSize * 0.55;
         } else {
-          rText = r - (tickDirection === 'inward' ? majorLen : 0) - numberOffset - numberSize * 0.55;
+          rText = r - rimExt - (tickDirection === 'inward' ? majorLen : 0) - numberOffset - numberSize * 0.55;
         }
         const pt = polar(a, rText);
         return (
