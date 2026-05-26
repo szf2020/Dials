@@ -56,7 +56,10 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     reverse,
   } = p;
 
-  const pad = Math.max(16, majorLen + (showNumbers ? numberOffset + numberSize : 0) + 4);
+  // Layout pad reserves space for the label, not the tick — so tick length is
+  // purely cosmetic and changing it doesn't shrink the axis. Mirrors how minor
+  // tick length already works.
+  const pad = Math.max(16, (showNumbers ? numberOffset + numberSize : 0) + 4);
   const labelFor = tickLabelFor(p);
 
   const isV = orientation === 'vertical';
