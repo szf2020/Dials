@@ -234,6 +234,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     numberPlacement,
     reverse,
     centerText, centerTextSize, centerTextWeight,
+    centerDot, centerDotSize,
   } = p;
 
   const labelFor = tickLabelFor(p);
@@ -319,6 +320,9 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
           </text>
         );
       })}
+      {centerDot && centerDotSize > 0 && (
+        <circle cx={cx} cy={cy} r={centerDotSize} fill={tickColor} />
+      )}
       {centerText && (
         <text
           x={cx} y={cy}

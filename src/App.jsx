@@ -26,6 +26,8 @@ const DEFAULTS = {
   centerText: '',
   centerTextSize: 28,
   centerTextWeight: 500,
+  centerDot: false,
+  centerDotSize: 8,
   tickColor: '#111111',
   bg: '#ffffff',
   // arc-specific
@@ -625,9 +627,17 @@ export default function App() {
         </Sec>
 
         {isArc && (
-          <Sec title="Title">
-            <div className="field">
-              <label>Center text</label>
+          <Sec title="Center">
+            <div className="row">
+              <label>Hub dot</label>
+              <Toggle checked={p.centerDot} onChange={(v) => set('centerDot', v)} />
+            </div>
+            {p.centerDot && (
+              <Slider label="Hub size" value={p.centerDotSize} min={1} max={80} step={1} onChange={(v) => set('centerDotSize', v)} suffix="px" />
+            )}
+
+            <div className="field" style={{ marginTop: 10 }}>
+              <label>Title text</label>
               <input
                 className="num mono"
                 type="text"
@@ -639,8 +649,8 @@ export default function App() {
             </div>
             {p.centerText && (
               <>
-                <Slider label="Size" value={p.centerTextSize} min={8} max={96} step={1} onChange={(v) => set('centerTextSize', v)} suffix="px" />
-                <Slider label="Weight" value={p.centerTextWeight} min={100} max={900} step={100} onChange={(v) => set('centerTextWeight', v)} />
+                <Slider label="Text size" value={p.centerTextSize} min={8} max={96} step={1} onChange={(v) => set('centerTextSize', v)} suffix="px" />
+                <Slider label="Text weight" value={p.centerTextWeight} min={100} max={900} step={100} onChange={(v) => set('centerTextWeight', v)} />
               </>
             )}
             <p className="hint">Rendered at the dial's pivot. For a semi-circle this sits at the bottom of the arc; for a full circle, the geometric centre.</p>
