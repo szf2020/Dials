@@ -129,10 +129,10 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
             fontSize={numberSize}
             fontWeight={numberWeight}
             fill={tickColor}
-            textAnchor={isV ? 'start' : 'middle'}
+            textAnchor={isV ? (side === -1 ? 'end' : 'start') : 'middle'}
             dominantBaseline={isV ? 'middle' : (side === 1 ? 'hanging' : 'auto')}
             dy={isV ? 0 : (side === 1 ? 2 : -2)}
-            dx={isV ? 4 : 0}
+            dx={isV ? (side === -1 ? -4 : 4) : 0}
           >
             {labelFor(v, i)}
           </text>
