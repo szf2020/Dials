@@ -77,6 +77,44 @@ function clean(p) {
   return out;
 }
 
+// Clamp every numeric field to the same bounds the UI handlers enforce so
+// values arriving from a URL hash, a preset, or older state can't push the
+// renderer (or export canvas) into pathological ranges. Non-finite values
+// fall back to DEFAULTS, then get clamped. Strings/booleans pass through.
+function sanitizeParams(p) {
+  const out = { ...p };
+  const clampN = (key, lo, hi, integer = false) => {
+    let n = Number(out[key]);
+    if (!Number.isFinite(n)) n = DEFAULTS[key];
+    if (integer) n = Math.round(n);
+    out[key] = Math.min(hi, Math.max(lo, n));
+  };
+  clampN('width', 80, 8192, true);
+  clampN('height', 80, 8192, true);
+  // min/max stay loose — clean() handles equal/inverted ranges — but must be finite
+  if (!Number.isFinite(Number(out.min))) out.min = DEFAULTS.min;
+  else out.min = Number(out.min);
+  if (!Number.isFinite(Number(out.max))) out.max = DEFAULTS.max;
+  else out.max = Number(out.max);
+  clampN('majorStep', 0.0001, 1e9);
+  clampN('subdivisions', 0, 100, true);
+  clampN('rimThickness', 0.5, 12);
+  clampN('majorLen', 2, 60);
+  clampN('minorLen', 1, 40);
+  clampN('majorWeight', 0.5, 8);
+  clampN('minorWeight', 0.25, 5);
+  clampN('numberSize', 6, 48);
+  clampN('numberOffset', 0, 40);
+  clampN('numberWeight', 100, 900, true);
+  clampN('centerTextSize', 8, 96);
+  clampN('centerTextWeight', 100, 900, true);
+  clampN('centerTextOffset', -1000, 1000);
+  clampN('centerDotSize', 1, 200);
+  clampN('startAngle', -180, 360);
+  clampN('sweepAngle', 30, 360);
+  return out;
+}
+
 function Sec({ id, title, children, defaultOpen = true }) {
   const storageKey = id ? `dialMaker.section.${id}` : null;
   const [open, setOpen] = useState(() => {
@@ -410,7 +448,7 @@ function decodeHashState(hash, defaults) {
 export default function App() {
   const [p, setP] = useState(() => {
     const fromHash = decodeHashState(window.location.hash.slice(1), DEFAULTS);
-    return fromHash ? { ...DEFAULTS, ...fromHash } : DEFAULTS;
+    return fromHash ? sanitizeParams({ ...DEFAULTS, ...fromHash }) : DEFAULTS;
   });
   const svgWrapRef = useRef(null);
 
@@ -430,11 +468,18 @@ export default function App() {
     return () => clearTimeout(t);
   }, [p]);
 
-  // React to the URL hash changing externally (paste, back/forward).
+  // React to the URL hash changing externally (paste, back/forward, manual
+  // edit). An empty hash means "reset to defaults" — without that branch the
+  // app silently ignored hash removal and the URL stopped reflecting state.
   useEffect(() => {
     const onHashChange = () => {
-      const next = decodeHashState(window.location.hash.slice(1), DEFAULTS);
-      if (next) setP({ ...DEFAULTS, ...next });
+      const hash = window.location.hash.slice(1);
+      if (!hash) {
+        setP(DEFAULTS);
+        return;
+      }
+      const next = decodeHashState(hash, DEFAULTS);
+      if (next) setP(sanitizeParams({ ...DEFAULTS, ...next }));
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -584,7 +629,7 @@ export default function App() {
         : 0;
     }
     delete merged.minorStep;
-    setP(merged);
+    setP(sanitizeParams(merged));
   }, [presets]);
   const deletePreset = useCallback((name) => {
     if (!window.confirm(`Delete preset "${name}"?`)) return;

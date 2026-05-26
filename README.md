@@ -64,4 +64,4 @@ If you fork this and want to deploy under a different repo name, change the `bas
 - Persisted storage:
   - `dialMaker.presets.v1` — saved presets (current dial config is intentionally **not** included; view state and presets stay separate).
   - `dialMaker.section.<id>` — open/closed state per sidebar section.
-- URL hash format: the full `p` state object, JSON-stringified then base64-encoded.
+- URL hash format: only fields that differ from `DEFAULTS`, written as short-key URL params via `URLSearchParams` (e.g. `#s=arc&sa=135&sw=270`). A default dial has no hash at all. Legacy base64-JSON hashes still decode for backward compatibility with older shared links. Values loaded from the hash (or from a preset) are sanitized — every numeric field is clamped to the same range its UI control allows.
