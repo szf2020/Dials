@@ -878,7 +878,7 @@ export default function App() {
             <NumField
               label="Subdivisions"
               value={p.subdivisions} step={1}
-              onChange={(v) => set('subdivisions', Math.max(0, Math.round(Number(v) || 0)))}
+              onChange={(v) => set('subdivisions', Math.min(100, Math.max(0, Math.round(Number(v) || 0))))}
             />
           </div>
           <p className="hint">Subdivisions = minor ticks between adjacent majors. 0 hides them.</p>
