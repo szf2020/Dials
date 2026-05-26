@@ -108,8 +108,8 @@ function sanitizeParams(p) {
   clampN('numberWeight', 100, 900, true);
   clampN('centerTextSize', 8, 96);
   clampN('centerTextWeight', 100, 900, true);
-  clampN('centerTextOffset', -1000, 1000);
-  clampN('centerDotSize', 1, 200);
+  clampN('centerTextOffset', -300, 300);
+  clampN('centerDotSize', 1, 80);
   clampN('startAngle', -180, 360);
   clampN('sweepAngle', 30, 360);
   return out;
@@ -905,8 +905,8 @@ export default function App() {
 
         <Sec id="canvas" title="Canvas">
           <div className="grid-2">
-            <NumField label="Width"  value={p.width}  onChange={(v) => set('width',  Math.max(80, Number(v) || 80))} />
-            <NumField label="Height" value={p.height} onChange={(v) => set('height', Math.max(80, Number(v) || 80))} />
+            <NumField label="Width"  value={p.width}  onChange={(v) => set('width',  Math.min(8192, Math.max(80, Math.round(Number(v) || 80))))} />
+            <NumField label="Height" value={p.height} onChange={(v) => set('height', Math.min(8192, Math.max(80, Math.round(Number(v) || 80))))} />
           </div>
           <div className="row gap-top">
             <label>Texture size</label>
