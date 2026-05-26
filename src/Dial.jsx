@@ -198,20 +198,32 @@ function ArcDial({ p, ticksMajor, ticksMinor }) {
   const {
     width, height,
     rim, rimThickness,
+    majorLen,
+    showNumbers, numberSize, numberOffset,
     startAngle,
     sweepAngle,
+    tickDirection,
+    numberPlacement,
   } = p;
 
   const cx = width / 2;
   const isFullCircle = Math.abs(sweepAngle) >= 360 - 0.001;
   const cy = height / 2;
 
-  // Outer margin reserves only the rim's half-thickness plus a small slack,
-  // so changing tick length or number size doesn't shrink the rim. Whatever
-  // extends past the rim (outward ticks, outside labels) just clips if the
-  // canvas is too small — same contract as the straight dial.
+  // For partial arcs the bbox-fit logic below shifts the dial to keep things
+  // visible, so a small slack margin is enough. For a full circle there's no
+  // shifting — the rim sits dead centre — so we have to physically reserve
+  // canvas space for whatever extends past the rim: outward ticks, outside
+  // labels, and the text-width overhang of inside labels at the cardinal
+  // points.
   const ringExtra = rim ? rimThickness / 2 : 0;
-  const outerExtra = ringExtra + 2;
+  const fullCircleLabelExt = isFullCircle && showNumbers
+    ? (numberPlacement === 'outside'
+        ? numberOffset + numberSize + 4
+        : numberSize * 0.55)
+    : 0;
+  const fullCircleTickExt = isFullCircle && tickDirection === 'outward' ? majorLen : 0;
+  const outerExtra = ringExtra + 2 + fullCircleLabelExt + fullCircleTickExt;
 
   let r = Math.min(width, height) / 2 - outerExtra;
   r = Math.max(20, r);
