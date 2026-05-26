@@ -94,6 +94,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     orientation,
     reverse,
     tickCornerRadius,
+    fontFamily,
   } = p;
 
   // Layout pad is a small fixed margin so the axis stays put no matter what
@@ -175,7 +176,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
           <text
             key={`n-${i}`}
             x={tx} y={ty}
-            fontFamily="Helvetica, Arial, sans-serif"
+            fontFamily={fontFamily}
             fontSize={numberSize}
             fontWeight={numberWeight}
             fill={tickColor}
@@ -283,6 +284,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     centerText, centerTextSize, centerTextWeight, centerTextOffset,
     centerDot, centerDotSize,
     tickCornerRadius,
+    fontFamily,
   } = p;
 
   const labelFor = tickLabelFor(p);
@@ -352,7 +354,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
           <text
             key={`n-${i}`}
             x={pt.x} y={pt.y}
-            fontFamily="Helvetica, Arial, sans-serif"
+            fontFamily={fontFamily}
             fontSize={numberSize}
             fontWeight={numberWeight}
             fill={tickColor}
@@ -369,7 +371,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
       {centerText && (
         <text
           x={cx} y={cy + (centerTextOffset || 0)}
-          fontFamily="Helvetica, Arial, sans-serif"
+          fontFamily={fontFamily}
           fontSize={centerTextSize}
           fontWeight={centerTextWeight}
           fill={tickColor}

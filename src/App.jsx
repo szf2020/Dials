@@ -33,6 +33,8 @@ const DEFAULTS = {
   tickColor: '#111111',
   bg: '#ffffff',
   pngScale: 2,              // PNG export resolution multiplier
+  fontFamily: 'Helvetica, Arial, sans-serif',
+  outlineOnExport: false,
   // arc-specific
   startAngle: 180,
   sweepAngle: 180,
@@ -43,6 +45,112 @@ const DEFAULTS = {
   orientation: 'horizontal',
   tickSide: 'below',        // below | above | both
 };
+
+// Curated typography choices. The CSS family is what we set on the SVG
+// `font-family`; the Google Fonts spec is what we inject into the head when
+// the user picks that family. `ttfUrl` is the fallback for outline-on-export
+// (Helvetica is proprietary so it has no outline source).
+const FONTS = [
+  {
+    label: 'Helvetica',
+    family: 'Helvetica, Arial, sans-serif',
+    gfont: null,
+    ttfUrl: null,
+  },
+  {
+    label: 'Inter',
+    family: 'Inter, sans-serif',
+    gfont: 'Inter:wght@100..900',
+    ttfUrl: 'https://cdn.jsdelivr.net/gh/rsms/inter@v3.19/docs/font-files/Inter-Regular.otf',
+  },
+  {
+    label: 'IBM Plex Mono',
+    family: '"IBM Plex Mono", monospace',
+    gfont: 'IBM+Plex+Mono:wght@100;300;400;500;600;700',
+    ttfUrl: 'https://cdn.jsdelivr.net/gh/IBM/plex@master/IBM-Plex-Mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf',
+  },
+  {
+    label: 'JetBrains Mono',
+    family: '"JetBrains Mono", monospace',
+    gfont: 'JetBrains+Mono:wght@100..800',
+    ttfUrl: 'https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@master/fonts/ttf/JetBrainsMono-Regular.ttf',
+  },
+  {
+    label: 'Space Mono',
+    family: '"Space Mono", monospace',
+    gfont: 'Space+Mono:wght@400;700',
+    ttfUrl: 'https://cdn.jsdelivr.net/gh/googlefonts/spacemono@main/fonts/SpaceMono-Regular.ttf',
+  },
+];
+const FONT_FAMILIES = FONTS.map((f) => f.family);
+const FONT_BY_FAMILY = Object.fromEntries(FONTS.map((f) => [f.family, f]));
+
+// ---- Outline-on-export helpers ----
+// Lazy-load opentype.js + the chosen font's TTF/OTF only when the user
+// actually exports with outlining enabled, so the main bundle stays small.
+// Parsed fonts are cached so repeated exports reuse them.
+const FONT_PROMISE_CACHE = new Map();
+async function loadOutlineFont(family) {
+  if (FONT_PROMISE_CACHE.has(family)) return FONT_PROMISE_CACHE.get(family);
+  const meta = FONT_BY_FAMILY[family];
+  if (!meta || !meta.ttfUrl) return null;
+  const promise = (async () => {
+    const [{ default: opentype }, buffer] = await Promise.all([
+      import('opentype.js'),
+      fetch(meta.ttfUrl).then((r) => {
+        if (!r.ok) throw new Error(`Font fetch ${r.status}`);
+        return r.arrayBuffer();
+      }),
+    ]);
+    return opentype.parse(buffer);
+  })();
+  FONT_PROMISE_CACHE.set(family, promise);
+  try {
+    return await promise;
+  } catch (err) {
+    FONT_PROMISE_CACHE.delete(family); // allow retry next time
+    throw err;
+  }
+}
+
+// Replace every <text> inside an SVG node tree with an outlined <path>.
+// We adjust the baseline position to compensate for text-anchor and
+// dominant-baseline because opentype's getPath() works in baseline coordinates.
+async function outlineTextInSvg(svgEl, family) {
+  const font = await loadOutlineFont(family);
+  if (!font) return; // Helvetica or other un-outlineable font; leave text as-is
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const textNodes = Array.from(svgEl.querySelectorAll('text'));
+  for (const node of textNodes) {
+    const text = node.textContent || '';
+    if (!text) continue;
+    const x = Number(node.getAttribute('x') || 0);
+    const y = Number(node.getAttribute('y') || 0);
+    const dx = Number(node.getAttribute('dx') || 0);
+    const dy = Number(node.getAttribute('dy') || 0);
+    const fontSize = Number(node.getAttribute('font-size') || 16);
+    const textAnchor = node.getAttribute('text-anchor') || 'start';
+    const baseline = node.getAttribute('dominant-baseline') || 'auto';
+    const fill = node.getAttribute('fill') || '#000';
+
+    let bx = x + dx;
+    let by = y + dy;
+    const advance = font.getAdvanceWidth(text, fontSize);
+    if (textAnchor === 'middle') bx -= advance / 2;
+    else if (textAnchor === 'end') bx -= advance;
+    // Approximate baseline shifts — exact values vary by font but these work
+    // well for the typography choices we offer.
+    if (baseline === 'middle') by += fontSize * 0.35;
+    else if (baseline === 'hanging') by += fontSize * 0.75;
+
+    const path = font.getPath(text, bx, by, fontSize);
+    const d = path.toPathData(2);
+    const replacement = document.createElementNS(SVG_NS, 'path');
+    replacement.setAttribute('d', d);
+    replacement.setAttribute('fill', fill);
+    node.parentNode.replaceChild(replacement, node);
+  }
+}
 
 // Preset shape configs
 const SHAPE_PRESETS = {
@@ -129,6 +237,7 @@ function sanitizeParams(p) {
   oneOf('orientation', ['horizontal', 'vertical']);
   oneOf('tickSide', ['below', 'above', 'both']);
   oneOf('bg', ['#ffffff', 'transparent']);
+  oneOf('fontFamily', FONT_FAMILIES);
 
   // tickColor isn't user-editable in the UI today but is part of the schema;
   // tolerate any 6-digit hex, fall back to default for anything else.
@@ -139,7 +248,7 @@ function sanitizeParams(p) {
   // Booleans: accept strict true/false only. !!val would turn truthy-looking
   // strings like "false", "0", or "no" into true, so a hand-crafted preset
   // could silently flip toggles. Fall back to DEFAULTS on anything else.
-  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot']) {
+  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport']) {
     if (out[key] !== true && out[key] !== false) out[key] = DEFAULTS[key];
   }
 
@@ -434,6 +543,8 @@ const HASH_KEYS = {
   tickColor: 'tc',
   bg: 'bg',
   pngScale: 'ps',
+  fontFamily: 'ff',
+  outlineOnExport: 'ote',
   startAngle: 'sa',
   sweepAngle: 'sw',
   tickDirection: 'td',
@@ -530,6 +641,23 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  // Load Google Fonts on demand. We keep a single <link> tag in <head> and
+  // rewrite its href when the selected font changes. Helvetica/Arial are
+  // assumed to be system-installed, so no link is needed for those.
+  useEffect(() => {
+    const meta = FONT_BY_FAMILY[p.fontFamily];
+    if (!meta || !meta.gfont) return;
+    const id = 'dials-gfont';
+    let link = document.getElementById(id);
+    if (!link) {
+      link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+    }
+    link.href = `https://fonts.googleapis.com/css2?family=${meta.gfont}&display=swap`;
+  }, [p.fontFamily]);
 
   const set = (k, v) => setP((prev) => ({ ...prev, [k]: v }));
   const setMany = (obj) => setP((prev) => ({ ...prev, ...obj }));
@@ -708,54 +836,61 @@ export default function App() {
   }, []);
 
   // ---- Export ----
-  const [copyStatus, setCopyStatus] = useState('idle'); // idle | ok | error
-  const copyResetRef = useRef(null);
-  const copySVG = useCallback(async () => {
+  // Clone the live SVG, normalise its sizing attributes, and (when requested)
+  // outline every <text> to a <path>. Returns an off-DOM SVG element.
+  const buildExportSvg = useCallback(async () => {
     const live = svgWrapRef.current?.querySelector('svg');
-    if (!live) return;
+    if (!live) return null;
     const clone = live.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('width', params.width);
     clone.setAttribute('height', params.height);
     clone.removeAttribute('style');
-    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+    if (params.outlineOnExport) {
+      try {
+        await outlineTextInSvg(clone, params.fontFamily);
+      } catch (err) {
+        // If outlining fails (network blip, parse error), fall back to the
+        // text-as-text export rather than blocking the action entirely.
+        console.error('outlineOnExport failed', err);
+      }
+    }
+    return clone;
+  }, [params]);
+
+  const serializeSvg = (el) => '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(el);
+
+  const [copyStatus, setCopyStatus] = useState('idle'); // idle | ok | error
+  const copyResetRef = useRef(null);
+  const copySVG = useCallback(async () => {
+    const clone = await buildExportSvg();
+    if (!clone) return;
     try {
-      await navigator.clipboard.writeText(xml);
+      await navigator.clipboard.writeText(serializeSvg(clone));
       setCopyStatus('ok');
     } catch {
       setCopyStatus('error');
     }
     if (copyResetRef.current) clearTimeout(copyResetRef.current);
     copyResetRef.current = setTimeout(() => setCopyStatus('idle'), 1500);
-  }, [params]);
+  }, [buildExportSvg]);
 
-  const exportSVG = useCallback(() => {
-    const live = svgWrapRef.current?.querySelector('svg');
-    if (!live) return;
-    const clone = live.cloneNode(true);
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clone.setAttribute('width', params.width);
-    clone.setAttribute('height', params.height);
-    clone.removeAttribute('style');
-    const xml = new XMLSerializer().serializeToString(clone);
-    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + xml], { type: 'image/svg+xml' });
+  const exportSVG = useCallback(async () => {
+    const clone = await buildExportSvg();
+    if (!clone) return;
+    const blob = new Blob([serializeSvg(clone)], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `dial-${params.shape}.svg`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [params]);
+  }, [buildExportSvg, params]);
 
-  const exportPNG = useCallback(() => {
-    const live = svgWrapRef.current?.querySelector('svg');
-    if (!live) return;
-    const clone = live.cloneNode(true);
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clone.setAttribute('width', params.width);
-    clone.setAttribute('height', params.height);
-    clone.removeAttribute('style');
-    const xml = new XMLSerializer().serializeToString(clone);
-    const svg64 = btoa(unescape(encodeURIComponent('<?xml version="1.0" encoding="UTF-8"?>\n' + xml)));
+  const exportPNG = useCallback(async () => {
+    const clone = await buildExportSvg();
+    if (!clone) return;
+    const xml = serializeSvg(clone);
+    const svg64 = btoa(unescape(encodeURIComponent(xml)));
     const img = new Image();
     img.onload = () => {
       const scale = params.pngScale || 2;
@@ -779,7 +914,7 @@ export default function App() {
       }, 'image/png');
     };
     img.src = 'data:image/svg+xml;base64,' + svg64;
-  }, [params]);
+  }, [buildExportSvg, params]);
 
   const reset = () => setP(DEFAULTS);
 
@@ -919,6 +1054,22 @@ export default function App() {
           )}
         </Sec>
 
+        <Sec id="typography" title="Typography">
+          <div className="row">
+            <label>Font</label>
+            <select
+              className="select mono"
+              value={p.fontFamily}
+              onChange={(e) => set('fontFamily', e.target.value)}
+            >
+              {FONTS.map((f) => (
+                <option key={f.family} value={f.family}>{f.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="hint">Applies to tick numbers, custom labels, and the centre title text.</p>
+        </Sec>
+
         <Sec id="numbers" title="Numbers">
           <div className="row">
             <label>Show numbers</label>
@@ -1027,6 +1178,10 @@ export default function App() {
               value={p.pngScale}
               onChange={(v) => set('pngScale', v)}
             />
+          </div>
+          <div className="row gap-top">
+            <label>Outline text on export</label>
+            <Toggle checked={p.outlineOnExport} onChange={(v) => set('outlineOnExport', v)} />
           </div>
           <div className="btn-row gap-top">
             <button className="btn" onClick={exportSVG}>Download SVG</button>
