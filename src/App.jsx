@@ -121,6 +121,19 @@ async function outlineTextInSvg(svgEl, family) {
   const font = await loadOutlineFont(family);
   if (!font) return; // Helvetica or other un-outlineable font; leave text as-is
   const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // Pull the font's vertical metrics once. opentype exposes ascender and
+  // descender in font units; we convert to per-fontSize multipliers. Fall
+  // back to typical Latin defaults if the font tables are unusual.
+  const unitsPerEm = font.unitsPerEm || 1000;
+  const ascendMul = (font.ascender || 800) / unitsPerEm;
+  const descendMul = (font.descender || -200) / unitsPerEm; // typically negative
+  // The em-box midpoint above the baseline is roughly (ascender + descender)/2
+  // (descender is negative). This is what SVG `dominant-baseline="middle"`
+  // aligns the visual centre to — using font metrics is more accurate than
+  // the previous hardcoded 0.35×fontSize approximation.
+  const middleMul = (ascendMul + descendMul) / 2;
+
   const textNodes = Array.from(svgEl.querySelectorAll('text'));
   for (const node of textNodes) {
     const text = node.textContent || '';
@@ -139,10 +152,8 @@ async function outlineTextInSvg(svgEl, family) {
     const advance = font.getAdvanceWidth(text, fontSize);
     if (textAnchor === 'middle') bx -= advance / 2;
     else if (textAnchor === 'end') bx -= advance;
-    // Approximate baseline shifts — exact values vary by font but these work
-    // well for the typography choices we offer.
-    if (baseline === 'middle') by += fontSize * 0.35;
-    else if (baseline === 'hanging') by += fontSize * 0.75;
+    if (baseline === 'middle') by += middleMul * fontSize;
+    else if (baseline === 'hanging') by += ascendMul * fontSize;
 
     const path = font.getPath(text, bx, by, fontSize);
     const d = path.toPathData(2);
@@ -171,19 +182,15 @@ function clean(p) {
     out.bg = p.bg === 'transparent' ? 'transparent' : '#000000';
   }
 
-  // Coerce numeric fields and guarantee a non-empty range. The NumField draft
-  // pattern already prevents '' from entering state, but old presets and
-  // future paths could still produce equal or inverted min/max.
-  const minN = Number(out.min);
-  const maxN = Number(out.max);
-  out.min = Number.isFinite(minN) ? minN : 0;
-  out.max = Number.isFinite(maxN) ? maxN : 100;
+  // Guarantee a non-empty range — sanitizeParams handles finiteness at load
+  // boundaries, but the user can still produce inverted/equal min and max
+  // live by typing max < min in the UI.
   if (out.max <= out.min) {
     const fallback = Math.max(1, Math.abs(Number(out.majorStep) || 1));
     out.max = out.min + fallback;
   }
 
-  // Derive the minor step from subdivisions count (minor ticks between adjacent majors)
+  // Derive the minor step from subdivisions (minor ticks between adjacent majors).
   out.minorStep = p.subdivisions > 0 ? out.majorStep / (p.subdivisions + 1) : 0;
   return out;
 }
@@ -725,30 +732,25 @@ export default function App() {
     applyZoom(zoomRef.current * factor, { x: e.clientX, y: e.clientY });
   }, [applyZoom]);
 
+  // Mirror pan into a ref so the global mousemove handler reads fresh values
+  // and so mousedown can capture the current pan synchronously.
+  const panRef = useRef(pan);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+
   const onStageMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
     if (e.target.closest('.zoom-ctl')) return;
     dragRef.current = {
       startX: e.clientX, startY: e.clientY,
-      panX: 0, panY: 0,
-      _initialized: false,
+      panX: panRef.current.x, panY: panRef.current.y,
     };
     setIsDragging(true);
     e.preventDefault();
   }, []);
 
-  // Mirror pan into a ref so the global mousemove handler reads fresh values
-  const panRef = useRef(pan);
-  useEffect(() => { panRef.current = pan; }, [pan]);
-
   useEffect(() => {
     const onMove = (ev) => {
       if (!dragRef.current) return;
-      if (!dragRef.current._initialized) {
-        dragRef.current.panX = panRef.current.x;
-        dragRef.current.panY = panRef.current.y;
-        dragRef.current._initialized = true;
-      }
       setPan({
         x: dragRef.current.panX + (ev.clientX - dragRef.current.startX),
         y: dragRef.current.panY + (ev.clientY - dragRef.current.startY),
@@ -908,12 +910,23 @@ export default function App() {
       }
       ctx.drawImage(img, 0, 0, cnv.width, cnv.height);
       cnv.toBlob((b) => {
+        if (!b) {
+          console.error('PNG export: canvas.toBlob returned null');
+          window.alert('PNG export failed — the canvas was rejected by the browser. Try a smaller canvas / PNG scale.');
+          return;
+        }
         const url = URL.createObjectURL(b);
         const a = document.createElement('a');
         a.href = url; a.download = `dial-${params.shape}@${scale}x.png`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }, 'image/png');
+    };
+    img.onerror = () => {
+      // Rare: very large dimensions or an SVG the browser refuses to parse as
+      // an image. Surface it rather than failing silently.
+      console.error('PNG export: failed to load SVG as image');
+      window.alert('PNG export failed — the browser could not rasterise the SVG. Try a smaller canvas / PNG scale.');
     };
     img.src = 'data:image/svg+xml;base64,' + svg64;
   }, [buildExportSvg, params]);
@@ -1030,7 +1043,7 @@ export default function App() {
             <NumField
               label="Major step"
               value={p.majorStep} step={p.majorStep < 1 ? 0.1 : 1}
-              onChange={(v) => set('majorStep', Math.max(0.0001, Number(v) || 0.0001))}
+              onChange={(v) => set('majorStep', Math.min(1e9, Math.max(0.0001, Number(v) || 0.0001)))}
             />
             <NumField
               label="Subdivisions"
@@ -1191,6 +1204,9 @@ export default function App() {
             <label>Outline text on export</label>
             <Toggle checked={p.outlineOnExport} onChange={(v) => set('outlineOnExport', v)} />
           </div>
+          {p.outlineOnExport && (
+            <p className="hint">Outlined glyphs are rendered at Regular weight regardless of the Number weight slider. Helvetica has no embeddable file, so outlining is a no-op when Helvetica is selected.</p>
+          )}
           <div className="btn-row gap-top">
             <button className="btn" onClick={exportSVG}>Download SVG</button>
             <button className="btn alt" onClick={exportPNG}>Download PNG</button>
