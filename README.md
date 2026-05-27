@@ -2,6 +2,8 @@
 
 A small browser tool for generating clean black-and-white (or colour-band-accented) dial scale graphics. Pick a shape, dial in the range and graduations, configure typography and colour zones, and download the result as a vector `.svg`, a multi-scale `.png`, or copy SVG markup straight to the clipboard.
 
+![Semi-circle speedometer with traffic-light colour band](docs/screenshots/semi-speedometer.png)
+
 **Live:** https://artofpilgrim.github.io/Dials/
 
 ## Features
@@ -35,6 +37,8 @@ A small browser tool for generating clean black-and-white (or colour-band-accent
 ### Invert
 - Renders white-on-black; flows through to the exports. The colour band keeps its user-defined colours regardless.
 
+![Inverted straight dial — white ticks on black](docs/screenshots/inverted-straight.png)
+
 ### Canvas
 - Manual width / height (capped at 8192 px each) plus one-click texture sizes (512 / 1024 / 2048) for Substance Painter and other PBR workflows.
 
@@ -52,11 +56,16 @@ A small browser tool for generating clean black-and-white (or colour-band-accent
 - The preview wrapper is sized via `ResizeObserver` so the canvas always fills the available stage area while preserving its aspect ratio.
 
 ### Export
+
+<img src="docs/screenshots/export-panel.png" alt="Export controls panel" width="380" align="right" />
+
 - **Download SVG** — vector, editable in any vector tool.
 - **Download PNG** at **1× / 2× / 3× / 4×** the canvas resolution.
 - **Transparent PNG** toggle forces an alpha-channel PNG regardless of the dial's background colour — useful for compositing into Painter / Figma.
 - **Outline text on export** — replaces every `<text>` element with a vector `<path>` (via opentype.js) so the receiver of the file doesn't need the font installed. opentype.js and the TTF are lazy-loaded only when the user actually exports with outlining on, so the main bundle stays small.
 - **Copy SVG to clipboard** — paste straight into Figma / Illustrator without round-tripping through the filesystem.
+
+<br clear="all" />
 
 ### Sidebar UX
 - **Collapsible sections** — click a heading to fold it; open/closed state persists per section in `localStorage`.
