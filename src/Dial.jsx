@@ -220,11 +220,11 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
   // 'outer' = same side as the ticks; 'inner' = opposite side.
   const renderBand = () => {
     if (!colorBandEnabled || !Array.isArray(colorBandZones) || colorBandZones.length === 0) return null;
-    const gap = 2;
     const primarySide = tickSide === 'above' ? -1 : 1;
     const bandSign = colorBandPosition === 'outer' ? primarySide : -primarySide;
-    // Centre of band perpendicular to the axis at `rimExt + gap + thickness/2`.
-    const bandOff = perp(rimExt + gap + colorBandThickness / 2, bandSign);
+    // Centre of band sits at `rimExt + thickness/2` from the axis so the
+    // band's rim-side edge meets the rim with no gap.
+    const bandOff = perp(rimExt + colorBandThickness / 2, bandSign);
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
@@ -449,13 +449,14 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     });
   };
 
-  // Colour band: one arc per zone, drawn below the ticks/rim.
+  // Colour band: one arc per zone, drawn below the ticks/rim. The band's
+  // rim-side edge sits at exactly the rim's outer (or inner) edge so there's
+  // no gap; the rim draws on top so any sub-pixel overlap is covered.
   let bandEl = null;
   if (colorBandEnabled && Array.isArray(colorBandZones) && colorBandZones.length > 0) {
-    const gap = 2;
     const bandR = colorBandPosition === 'outer'
-      ? r + rimExt + gap + colorBandThickness / 2
-      : r - rimExt - gap - colorBandThickness / 2;
+      ? r + rimExt + colorBandThickness / 2
+      : r - rimExt - colorBandThickness / 2;
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
