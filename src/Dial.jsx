@@ -150,6 +150,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     tickRoundBoth,
     fontFamily,
     colorBandEnabled, colorBandThickness, colorBandPosition, colorBandZones,
+    colorBandStart, colorBandEnd,
   } = p;
 
   // Layout pad is a small fixed margin so the axis stays put no matter what
@@ -220,28 +221,35 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
   // 'outer' = same side as the ticks; 'inner' = opposite side.
   const renderBand = () => {
     if (!colorBandEnabled || !Array.isArray(colorBandZones) || colorBandZones.length === 0) return null;
+    const bStart = Math.max(min, Math.min(max, colorBandStart));
+    const bEnd = Math.max(bStart, Math.min(max, colorBandEnd));
+    if (bEnd <= bStart) return null;
     const primarySide = tickSide === 'above' ? -1 : 1;
     const bandSign = colorBandPosition === 'outer' ? primarySide : -primarySide;
     // Centre of band sits at `rimExt + thickness/2` from the axis so the
     // band's rim-side edge meets the rim with no gap.
     const bandOff = perp(rimExt + colorBandThickness / 2, bandSign);
-    // Extend the first and last zones by half the major-tick weight so the
-    // band's edges cover the first/last tick's stroke, not stop at the tick
-    // centerline. Reverse direction is handled automatically by valueToPos.
+    // Extend by half the major-tick weight at the band's outer edges only,
+    // so the first/last tick's stroke is fully covered. Reverse direction
+    // is handled automatically by valueToPos.
     const span = max - min;
     const valueExt = length > 0 && span > 0 ? (majorWeight / 2) * span / length : 0;
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
       const zone = colorBandZones[i];
-      const isFirst = i === 0;
-      const isLast = i === colorBandZones.length - 1;
-      const zStart = Math.max(min, prevEnd);
-      const zEnd = Math.min(max, zone.endValue);
-      prevEnd = zone.endValue;
-      if (zEnd <= zStart) continue;
-      const a = valueToPos(isFirst ? min - valueExt : zStart);
-      const b = valueToPos(isLast ? max + valueExt : zEnd);
+      const zStart = prevEnd;
+      const zEnd = zone.endValue;
+      prevEnd = zEnd;
+      const vStart = Math.max(bStart, zStart);
+      const vEnd = Math.min(bEnd, zEnd);
+      if (vEnd <= vStart) continue;
+      const atBandStart = vStart <= bStart + 1e-9;
+      const atBandEnd = vEnd >= bEnd - 1e-9;
+      const drawStart = atBandStart ? bStart - valueExt : vStart;
+      const drawEnd = atBandEnd ? bEnd + valueExt : vEnd;
+      const a = valueToPos(drawStart);
+      const b = valueToPos(drawEnd);
       // Bounding box of the rect (with band thickness across the axis).
       const x = Math.min(a.x, b.x) + (isV ? bandOff.dx - colorBandThickness / 2 : 0);
       const y = Math.min(a.y, b.y) + (isV ? 0 : bandOff.dy - colorBandThickness / 2);
@@ -373,6 +381,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     tickRoundBoth,
     fontFamily,
     colorBandEnabled, colorBandThickness, colorBandPosition, colorBandZones,
+    colorBandStart, colorBandEnd,
   } = p;
 
   const labelFor = tickLabelFor(p);
@@ -418,36 +427,40 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
   // Colour band: one arc per zone, drawn below the ticks/rim. The band's
   // rim-side edge sits at exactly the rim's outer (or inner) edge so there's
   // no gap; the rim draws on top so any sub-pixel overlap is covered.
+  // [bStart, bEnd] clips the band to a sub-range of the dial; zones outside
+  // that window aren't rendered.
   let bandEl = null;
   if (colorBandEnabled && Array.isArray(colorBandZones) && colorBandZones.length > 0) {
     const bandR = colorBandPosition === 'outer'
       ? r + rimExt + colorBandThickness / 2
       : r - rimExt - colorBandThickness / 2;
-    // Defensive: skip rendering if the inner-band radius collapses past the
-    // dial centre (only reachable if the thickness cap were widened later).
-    if (bandR > 0) {
-    // Extend the first and last zones by an angular amount equivalent to
-    // majorWeight/2 pixels at the band's radius, so the band's edges fully
-    // cover the first/last tick's stroke instead of stopping at the tick
-    // centerline. Expressed as a value offset so valueToAngle handles
-    // reverse direction automatically.
+    const bStart = Math.max(min, Math.min(max, colorBandStart));
+    const bEnd = Math.max(bStart, Math.min(max, colorBandEnd));
+    if (bandR > 0 && bEnd > bStart) {
     const span = max - min;
     const sweepMag = Math.abs(sweepAngle);
-    const valueExt = (bandR > 0 && sweepMag > 0 && span > 0)
+    const valueExt = (sweepMag > 0 && span > 0)
       ? ((majorWeight / 2) / bandR) * (180 / Math.PI) * span / sweepMag
       : 0;
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
       const zone = colorBandZones[i];
-      const isFirst = i === 0;
-      const isLast = i === colorBandZones.length - 1;
-      const zStart = Math.max(min, prevEnd);
-      const zEnd = Math.min(max, zone.endValue);
-      prevEnd = zone.endValue;
-      if (zEnd <= zStart) continue;
-      const a0 = valueToAngle(isFirst ? min - valueExt : zStart);
-      const a1 = valueToAngle(isLast ? max + valueExt : zEnd);
+      const zStart = prevEnd;
+      const zEnd = zone.endValue;
+      prevEnd = zEnd;
+      // Clip the zone to the band's [bStart, bEnd] window.
+      const vStart = Math.max(bStart, zStart);
+      const vEnd = Math.min(bEnd, zEnd);
+      if (vEnd <= vStart) continue;
+      // Extend only at the visible band's outer edges (where the first/last
+      // major tick lives), not at interior zone boundaries.
+      const atBandStart = vStart <= bStart + 1e-9;
+      const atBandEnd = vEnd >= bEnd - 1e-9;
+      const drawStart = atBandStart ? bStart - valueExt : vStart;
+      const drawEnd = atBandEnd ? bEnd + valueExt : vEnd;
+      const a0 = valueToAngle(drawStart);
+      const a1 = valueToAngle(drawEnd);
       const sweep = a1 - a0;
       const p0 = polar(a0, bandR);
       const p1 = polar(a1, bandR);
@@ -466,7 +479,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
       );
     }
     if (segs.length > 0) bandEl = <g>{segs}</g>;
-    } // end if (bandR > 0)
+    } // end if (bandR > 0 && bEnd > bStart)
   }
 
   let rimEl = null;

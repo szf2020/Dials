@@ -41,6 +41,8 @@ const DEFAULTS = {
   colorBandEnabled: false,
   colorBandThickness: 10,
   colorBandPosition: 'outer',     // 'inner' | 'outer' (relative to rim)
+  colorBandStart: 0,              // band start value (defaults to dial min)
+  colorBandEnd: 100,              // band end value (defaults to dial max)
   colorBandZones: [
     { color: '#3a9d2a', endValue: 50 },   // start = min, end = 50
     { color: '#e4c41a', endValue: 80 },
@@ -270,6 +272,16 @@ function sanitizeParams(p) {
   // could silently flip toggles. Fall back to DEFAULTS on anything else.
   for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport', 'tickRoundBoth', 'colorBandEnabled', 'pngTransparent']) {
     if (out[key] !== true && out[key] !== false) out[key] = DEFAULTS[key];
+  }
+
+  // Colour-band start/end: clamp into [min, max] and ensure start < end.
+  const csN = Number(out.colorBandStart);
+  const ceN = Number(out.colorBandEnd);
+  out.colorBandStart = Number.isFinite(csN) ? Math.max(out.min, Math.min(out.max, csN)) : out.min;
+  out.colorBandEnd = Number.isFinite(ceN) ? Math.max(out.min, Math.min(out.max, ceN)) : out.max;
+  if (out.colorBandEnd <= out.colorBandStart) {
+    out.colorBandStart = out.min;
+    out.colorBandEnd = out.max;
   }
 
   // Colour-band zones: validate hex colours, finite endValues, monotonic stops,
@@ -509,7 +521,12 @@ function applyPreset(name, min, max) {
   return template.map((z) => ({ color: z.color, endValue: min + z.endValue * span }));
 }
 
-function ColorBandEditor({ zones, min, max, position, thickness, onChangeZones, onChangePosition, onChangeThickness }) {
+function ColorBandEditor({
+  zones, min, max, position, thickness,
+  bandStart, bandEnd,
+  onChangeZones, onChangePosition, onChangeThickness,
+  onChangeBandStart, onChangeBandEnd,
+}) {
   const span = Math.max(1e-9, max - min);
   const updateZone = (i, patch) => {
     const next = zones.map((z, idx) => (idx === i ? { ...z, ...patch } : z));
@@ -554,6 +571,19 @@ function ColorBandEditor({ zones, min, max, position, thickness, onChangeZones, 
         />
       </div>
       <Slider label="Thickness" value={thickness} min={1} max={30} step={1} onChange={onChangeThickness} suffix="px" />
+
+      <div className="grid-2 gap-top">
+        <NumField
+          label="Start"
+          value={bandStart}
+          onChange={(v) => onChangeBandStart(Math.max(min, Math.min(bandEnd, Number(v))))}
+        />
+        <NumField
+          label="End"
+          value={bandEnd}
+          onChange={(v) => onChangeBandEnd(Math.max(bandStart, Math.min(max, Number(v))))}
+        />
+      </div>
 
       {/* Stacked proportional preview */}
       <div className="band-preview" aria-hidden="true">
@@ -743,6 +773,8 @@ const HASH_KEYS = {
   colorBandEnabled: 'cbe',
   colorBandThickness: 'cbt',
   colorBandPosition: 'cbp',
+  colorBandStart: 'cbsv',
+  colorBandEnd: 'cbev',
   colorBandZones: 'cbz',
   startAngle: 'sa',
   sweepAngle: 'sw',
@@ -1302,9 +1334,13 @@ export default function App() {
               max={p.max}
               position={p.colorBandPosition}
               thickness={p.colorBandThickness}
+              bandStart={p.colorBandStart}
+              bandEnd={p.colorBandEnd}
               onChangeZones={(zones) => set('colorBandZones', zones)}
               onChangePosition={(v) => set('colorBandPosition', v)}
               onChangeThickness={(v) => set('colorBandThickness', v)}
+              onChangeBandStart={(v) => set('colorBandStart', v)}
+              onChangeBandEnd={(v) => set('colorBandEnd', v)}
             />
           )}
         </Sec>
