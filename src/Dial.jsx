@@ -314,26 +314,19 @@ function ArcDial({ p, ticksMajor, ticksMinor }) {
 
   // How far past the rim does the content reach? Used both as canvas headroom
   // for full circles (no shifting possible) and as bbox padding when fitting
-  // a partial arc. Without this, outside labels / outward ticks on a custom
-  // arc clip at the canvas edges because the bbox only sampled the rim.
+  // a partial arc. We always reserve as though labels were placed *outside*,
+  // regardless of the current `numberPlacement`, so switching inside↔outside
+  // doesn't grow/shrink the rim. Inside-labelled dials just get a slightly
+  // smaller rim than they strictly need.
   const ringExtra = rim ? rimThickness / 2 : 0;
   const charHalfWidth = numberSize * 0.3; // ~halfwidth of one char in a typical sans-serif
   const labelHalfWidth = showNumbers ? maxLabelChars(p, ticksMajor) * charHalfWidth : 0;
   const labelHalfHeight = showNumbers ? numberSize * 0.55 : 0;
-  // Outside-label radial extent past the rim: tick (if outward) + offset +
-  // gap between label center and rim + the larger of the label's half-extents
-  // (worst case: a wide label sitting at the cardinal axis).
   const tickOutExt = (tickDirection === 'outward' || tickDirection === 'both') ? majorLen : 0;
-  const outsideLabelExt = (showNumbers && numberPlacement === 'outside')
+  const labelExt = showNumbers
     ? tickOutExt + numberOffset + labelHalfHeight + Math.max(labelHalfWidth, labelHalfHeight) + 4
     : 0;
-  // Full-circle inside labels at the cardinal points overhang the rim by
-  // roughly their half-extent (text-anchor + dominant-baseline are both
-  // 'middle', so the label sits centred on the radial position).
-  const insideLabelExt = (isFullCircle && showNumbers && numberPlacement === 'inside')
-    ? labelHalfHeight
-    : 0;
-  const outerExtra = ringExtra + 2 + Math.max(tickOutExt, outsideLabelExt, insideLabelExt);
+  const outerExtra = ringExtra + 2 + Math.max(tickOutExt, labelExt);
 
   let r = Math.min(width, height) / 2 - outerExtra;
   r = Math.max(20, r);
