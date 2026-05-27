@@ -314,15 +314,16 @@ function ArcDial({ p, ticksMajor, ticksMinor }) {
 
   // How far past the rim does the content reach? Used both as canvas headroom
   // for full circles (no shifting possible) and as bbox padding when fitting
-  // a partial arc. We always reserve as though labels were placed *outside*,
-  // regardless of the current `numberPlacement`, so switching inside↔outside
-  // doesn't grow/shrink the rim. Inside-labelled dials just get a slightly
-  // smaller rim than they strictly need.
+  // a partial arc. We always reserve as though ticks pointed outward and
+  // labels were placed outside, regardless of the current `tickDirection` /
+  // `numberPlacement`, so flipping either toggle is purely cosmetic and
+  // doesn't grow/shrink the rim. Inward-tick / inside-labelled dials just
+  // get a slightly smaller rim than they strictly need.
   const ringExtra = rim ? rimThickness / 2 : 0;
   const charHalfWidth = numberSize * 0.3; // ~halfwidth of one char in a typical sans-serif
   const labelHalfWidth = showNumbers ? maxLabelChars(p, ticksMajor) * charHalfWidth : 0;
   const labelHalfHeight = showNumbers ? numberSize * 0.55 : 0;
-  const tickOutExt = (tickDirection === 'outward' || tickDirection === 'both') ? majorLen : 0;
+  const tickOutExt = majorLen;
   const labelExt = showNumbers
     ? tickOutExt + numberOffset + labelHalfHeight + Math.max(labelHalfWidth, labelHalfHeight) + 4
     : 0;
