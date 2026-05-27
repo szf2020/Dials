@@ -22,6 +22,20 @@ function tickLabelFor(p) {
   };
 }
 
+// Widest major-tick label, in characters. Used to reserve enough canvas room
+// for outside labels — a 3-char "140" or 4-char "KM/H" needs more horizontal
+// headroom than a single digit. Approximate; the renderer doesn't measure
+// real glyph widths.
+function maxLabelChars(p, ticksMajor) {
+  const label = tickLabelFor(p);
+  let m = 0;
+  for (let i = 0; i < ticksMajor.length; i++) {
+    const s = label(ticksMajor[i], i);
+    if (s.length > m) m = s.length;
+  }
+  return m;
+}
+
 // Hard ceiling on tick count so a misconfigured range/step can't freeze the
 // browser. Picked well above any realistic dial; pathological values bail.
 const MAX_TICKS = 5000;
@@ -263,20 +277,28 @@ function ArcDial({ p, ticksMajor, ticksMinor }) {
   const isFullCircle = Math.abs(sweepAngle) >= 360 - 0.001;
   const cy = height / 2;
 
-  // For partial arcs the bbox-fit logic below shifts the dial to keep things
-  // visible, so a small slack margin is enough. For a full circle there's no
-  // shifting — the rim sits dead centre — so we have to physically reserve
-  // canvas space for whatever extends past the rim: outward ticks, outside
-  // labels, and the text-width overhang of inside labels at the cardinal
-  // points.
+  // How far past the rim does the content reach? Used both as canvas headroom
+  // for full circles (no shifting possible) and as bbox padding when fitting
+  // a partial arc. Without this, outside labels / outward ticks on a custom
+  // arc clip at the canvas edges because the bbox only sampled the rim.
   const ringExtra = rim ? rimThickness / 2 : 0;
-  const fullCircleLabelExt = isFullCircle && showNumbers
-    ? (numberPlacement === 'outside'
-        ? numberOffset + numberSize + 4
-        : numberSize * 0.55)
+  const charHalfWidth = numberSize * 0.3; // ~halfwidth of one char in a typical sans-serif
+  const labelHalfWidth = showNumbers ? maxLabelChars(p, ticksMajor) * charHalfWidth : 0;
+  const labelHalfHeight = showNumbers ? numberSize * 0.55 : 0;
+  // Outside-label radial extent past the rim: tick (if outward) + offset +
+  // gap between label center and rim + the larger of the label's half-extents
+  // (worst case: a wide label sitting at the cardinal axis).
+  const tickOutExt = tickDirection === 'outward' ? majorLen : 0;
+  const outsideLabelExt = (showNumbers && numberPlacement === 'outside')
+    ? tickOutExt + numberOffset + labelHalfHeight + Math.max(labelHalfWidth, labelHalfHeight) + 4
     : 0;
-  const fullCircleTickExt = isFullCircle && tickDirection === 'outward' ? majorLen : 0;
-  const outerExtra = ringExtra + 2 + fullCircleLabelExt + fullCircleTickExt;
+  // Full-circle inside labels at the cardinal points overhang the rim by
+  // roughly their half-extent (text-anchor + dominant-baseline are both
+  // 'middle', so the label sits centred on the radial position).
+  const insideLabelExt = (isFullCircle && showNumbers && numberPlacement === 'inside')
+    ? labelHalfHeight
+    : 0;
+  const outerExtra = ringExtra + 2 + Math.max(tickOutExt, outsideLabelExt, insideLabelExt);
 
   let r = Math.min(width, height) / 2 - outerExtra;
   r = Math.max(20, r);
