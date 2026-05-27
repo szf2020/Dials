@@ -225,16 +225,23 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     // Centre of band sits at `rimExt + thickness/2` from the axis so the
     // band's rim-side edge meets the rim with no gap.
     const bandOff = perp(rimExt + colorBandThickness / 2, bandSign);
+    // Extend the first and last zones by half the major-tick weight so the
+    // band's edges cover the first/last tick's stroke, not stop at the tick
+    // centerline. Reverse direction is handled automatically by valueToPos.
+    const span = max - min;
+    const valueExt = length > 0 && span > 0 ? (majorWeight / 2) * span / length : 0;
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
       const zone = colorBandZones[i];
+      const isFirst = i === 0;
+      const isLast = i === colorBandZones.length - 1;
       const zStart = Math.max(min, prevEnd);
       const zEnd = Math.min(max, zone.endValue);
       prevEnd = zone.endValue;
       if (zEnd <= zStart) continue;
-      const a = valueToPos(zStart);
-      const b = valueToPos(zEnd);
+      const a = valueToPos(isFirst ? min - valueExt : zStart);
+      const b = valueToPos(isLast ? max + valueExt : zEnd);
       // Bounding box of the rect (with band thickness across the axis).
       const x = Math.min(a.x, b.x) + (isV ? bandOff.dx - colorBandThickness / 2 : 0);
       const y = Math.min(a.y, b.y) + (isV ? 0 : bandOff.dy - colorBandThickness / 2);
@@ -453,16 +460,28 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     const bandR = colorBandPosition === 'outer'
       ? r + rimExt + colorBandThickness / 2
       : r - rimExt - colorBandThickness / 2;
+    // Extend the first and last zones by an angular amount equivalent to
+    // majorWeight/2 pixels at the band's radius, so the band's edges fully
+    // cover the first/last tick's stroke instead of stopping at the tick
+    // centerline. Expressed as a value offset so valueToAngle handles
+    // reverse direction automatically.
+    const span = max - min;
+    const sweepMag = Math.abs(sweepAngle);
+    const valueExt = (bandR > 0 && sweepMag > 0 && span > 0)
+      ? ((majorWeight / 2) / bandR) * (180 / Math.PI) * span / sweepMag
+      : 0;
     const segs = [];
     let prevEnd = min;
     for (let i = 0; i < colorBandZones.length; i++) {
       const zone = colorBandZones[i];
+      const isFirst = i === 0;
+      const isLast = i === colorBandZones.length - 1;
       const zStart = Math.max(min, prevEnd);
       const zEnd = Math.min(max, zone.endValue);
       prevEnd = zone.endValue;
       if (zEnd <= zStart) continue;
-      const a0 = valueToAngle(zStart);
-      const a1 = valueToAngle(zEnd);
+      const a0 = valueToAngle(isFirst ? min - valueExt : zStart);
+      const a1 = valueToAngle(isLast ? max + valueExt : zEnd);
       const sweep = a1 - a0;
       const p0 = polar(a0, bandR);
       const p1 = polar(a1, bandR);
