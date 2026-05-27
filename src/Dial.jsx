@@ -331,19 +331,28 @@ function ArcDial({ p, ticksMajor, ticksMinor }) {
     : 0;
   const outerExtra = ringExtra + 2 + Math.max(tickOutExt, labelExt);
 
+  // Default: pivot at canvas centre, r limited by the smaller dimension. This
+  // is stable as startAngle / sweepAngle change — no more dial-jumping.
+  let pivotX = cx;
+  let pivotY = cy;
   let r = Math.min(width, height) / 2 - outerExtra;
+
+  // Per-shape anchor adjustments for shapes that only fill part of their
+  // bbox, so we don't waste a chunk of canvas. Semi is the obvious case.
+  if (p.shape === 'semi') {
+    // Top-half semi (startAngle=180, sweep=180 locked by clean()). Anchor
+    // pivot near the bottom of the canvas so the arc fills upward. r can
+    // grow because we only need `r` of vertical room (not `2r`).
+    r = Math.min(width / 2 - outerExtra, height - 2 * outerExtra);
+    pivotY = height - outerExtra;
+  }
+
   r = Math.max(20, r);
 
-  // Pivot stays at the canvas centre regardless of startAngle / sweepAngle.
-  // Previously we shifted the dial to centre the visible arc's bbox, which
-  // looked tighter for partial arcs but caused the whole dial to jump around
-  // any time the user nudged the angle sliders. The trade-off now is some
-  // empty canvas space for partial arcs — the user can shrink the canvas in
-  // the Canvas section if they want a tight fit.
   return (
     <ArcDialBody
       p={p} ticksMajor={ticksMajor} ticksMinor={ticksMinor}
-      cx={cx} cy={cy} r={r}
+      cx={pivotX} cy={pivotY} r={r}
     />
   );
 }
