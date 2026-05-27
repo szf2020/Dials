@@ -149,6 +149,7 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     tickCornerRadius,
     tickRoundBoth,
     fontFamily,
+    colorBandEnabled, colorBandThickness, colorBandPosition, colorBandZones,
   } = p;
 
   // Layout pad is a small fixed margin so the axis stays put no matter what
@@ -214,8 +215,42 @@ function StraightDial({ p, ticksMajor, ticksMinor }) {
     });
   };
 
+  // Colour band: one <rect> per zone, drawn beneath the ticks/rim.
+  // Sits parallel to the axis on whichever side `colorBandPosition` picks.
+  // 'outer' = same side as the ticks; 'inner' = opposite side.
+  const renderBand = () => {
+    if (!colorBandEnabled || !Array.isArray(colorBandZones) || colorBandZones.length === 0) return null;
+    const gap = 2;
+    const primarySide = tickSide === 'above' ? -1 : 1;
+    const bandSign = colorBandPosition === 'outer' ? primarySide : -primarySide;
+    // Centre of band perpendicular to the axis at `rimExt + gap + thickness/2`.
+    const bandOff = perp(rimExt + gap + colorBandThickness / 2, bandSign);
+    const segs = [];
+    let prevEnd = min;
+    for (let i = 0; i < colorBandZones.length; i++) {
+      const zone = colorBandZones[i];
+      const zStart = Math.max(min, prevEnd);
+      const zEnd = Math.min(max, zone.endValue);
+      prevEnd = zone.endValue;
+      if (zEnd <= zStart) continue;
+      const a = valueToPos(zStart);
+      const b = valueToPos(zEnd);
+      // Bounding box of the rect (with band thickness across the axis).
+      const x = Math.min(a.x, b.x) + (isV ? bandOff.dx - colorBandThickness / 2 : 0);
+      const y = Math.min(a.y, b.y) + (isV ? 0 : bandOff.dy - colorBandThickness / 2);
+      const w = isV ? colorBandThickness : Math.abs(b.x - a.x);
+      const h = isV ? Math.abs(b.y - a.y) : colorBandThickness;
+      segs.push(
+        <rect key={`band-${i}`} x={x} y={y} width={w} height={h} fill={zone.color} />
+      );
+    }
+    return segs.length > 0 ? <g>{segs}</g> : null;
+  };
+
   return (
     <g>
+      {/* Colour band sits beneath everything else. */}
+      {renderBand()}
       {/* Ticks first so the rim draws on top of any back-extension that
           would otherwise protrude past the rim's far edge. */}
       {ticksMinor.map((v, i) => tickLine(v, minorLen, minorWeight, `mi-${i}`))}
@@ -373,6 +408,7 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     tickCornerRadius,
     tickRoundBoth,
     fontFamily,
+    colorBandEnabled, colorBandThickness, colorBandPosition, colorBandZones,
   } = p;
 
   const labelFor = tickLabelFor(p);
@@ -413,6 +449,43 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
     });
   };
 
+  // Colour band: one arc per zone, drawn below the ticks/rim.
+  let bandEl = null;
+  if (colorBandEnabled && Array.isArray(colorBandZones) && colorBandZones.length > 0) {
+    const gap = 2;
+    const bandR = colorBandPosition === 'outer'
+      ? r + rimExt + gap + colorBandThickness / 2
+      : r - rimExt - gap - colorBandThickness / 2;
+    const segs = [];
+    let prevEnd = min;
+    for (let i = 0; i < colorBandZones.length; i++) {
+      const zone = colorBandZones[i];
+      const zStart = Math.max(min, prevEnd);
+      const zEnd = Math.min(max, zone.endValue);
+      prevEnd = zone.endValue;
+      if (zEnd <= zStart) continue;
+      const a0 = valueToAngle(zStart);
+      const a1 = valueToAngle(zEnd);
+      const sweep = a1 - a0;
+      const p0 = polar(a0, bandR);
+      const p1 = polar(a1, bandR);
+      const largeArc = Math.abs(sweep) > 180 ? 1 : 0;
+      const sweepFlag = sweep >= 0 ? 1 : 0;
+      const d = `M ${p0.x} ${p0.y} A ${bandR} ${bandR} 0 ${largeArc} ${sweepFlag} ${p1.x} ${p1.y}`;
+      segs.push(
+        <path
+          key={`band-${i}`}
+          d={d}
+          stroke={zone.color}
+          strokeWidth={colorBandThickness}
+          fill="none"
+          strokeLinecap="butt"
+        />
+      );
+    }
+    if (segs.length > 0) bandEl = <g>{segs}</g>;
+  }
+
   let rimEl = null;
   if (rim) {
     if (isFullCircle) {
@@ -435,6 +508,9 @@ function ArcDialBody({ p, ticksMajor, ticksMinor, cx, cy, r }) {
 
   return (
     <g>
+      {/* Colour band sits beneath everything else so ticks and rim read on
+          top of it. */}
+      {bandEl}
       {/* Ticks first so the rim draws on top of any back-extension that
           would otherwise protrude past the rim's far edge. */}
       {ticksMinor.map((v, i) => tickAt(v, minorLen, minorWeight, `mi-${i}`))}

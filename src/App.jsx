@@ -36,6 +36,15 @@ const DEFAULTS = {
   pngScale: 2,              // PNG export resolution multiplier
   fontFamily: 'Helvetica, Arial, sans-serif',
   outlineOnExport: false,
+  // Colour band (zone indicator)
+  colorBandEnabled: false,
+  colorBandThickness: 10,
+  colorBandPosition: 'outer',     // 'inner' | 'outer' (relative to rim)
+  colorBandZones: [
+    { color: '#3a9d2a', endValue: 50 },   // start = min, end = 50
+    { color: '#e4c41a', endValue: 80 },
+    { color: '#d63a3a', endValue: 100 },  // last zone ends at max
+  ],
   // arc-specific
   startAngle: 180,
   sweepAngle: 180,
@@ -234,6 +243,7 @@ function sanitizeParams(p) {
   clampN('startAngle', -180, 360);
   clampN('sweepAngle', 30, 360);
   clampN('pngScale', 1, 4, true);
+  clampN('colorBandThickness', 1, 30);
 
   // Enum allowlists — must match the options offered by the matching <Seg>.
   const oneOf = (key, allowed) => {
@@ -246,6 +256,7 @@ function sanitizeParams(p) {
   oneOf('tickSide', ['below', 'above', 'both']);
   oneOf('bg', ['#ffffff', 'transparent']);
   oneOf('fontFamily', FONT_FAMILIES);
+  oneOf('colorBandPosition', ['inner', 'outer']);
 
   // tickColor isn't user-editable in the UI today but is part of the schema;
   // tolerate any 6-digit hex, fall back to default for anything else.
@@ -256,9 +267,13 @@ function sanitizeParams(p) {
   // Booleans: accept strict true/false only. !!val would turn truthy-looking
   // strings like "false", "0", or "no" into true, so a hand-crafted preset
   // could silently flip toggles. Fall back to DEFAULTS on anything else.
-  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport', 'tickRoundBoth']) {
+  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport', 'tickRoundBoth', 'colorBandEnabled']) {
     if (out[key] !== true && out[key] !== false) out[key] = DEFAULTS[key];
   }
+
+  // Colour-band zones: validate hex colours, finite endValues, monotonic stops,
+  // and that the last stop reaches max.
+  out.colorBandZones = sanitizeZones(out.colorBandZones, out.min, out.max);
 
   // Free-form strings: enforce type and a soft length cap so a giant URL
   // can't drag the renderer into a stall.
@@ -477,6 +492,135 @@ function Toggle({ checked, onChange }) {
   );
 }
 
+// Colour-band zone editor. Renders a stacked preview bar so the user can
+// see relative proportions at a glance, plus a list of per-zone rows for
+// the actual editing (colour + numeric end-value + delete).
+const BAND_PRESETS = {
+  Traffic:  [{ color: '#3a9d2a', endValue: 0.5 }, { color: '#e4c41a', endValue: 0.8 }, { color: '#d63a3a', endValue: 1.0 }],
+  Warning:  [{ color: '#777777', endValue: 0.8 }, { color: '#d63a3a', endValue: 1.0 }],
+  Cool:     [{ color: '#2a6fb4', endValue: 0.33 }, { color: '#aaaaaa', endValue: 0.66 }, { color: '#d63a3a', endValue: 1.0 }],
+  Mono:     [{ color: '#cccccc', endValue: 0.5 }, { color: '#666666', endValue: 1.0 }],
+};
+function applyPreset(name, min, max) {
+  const template = BAND_PRESETS[name];
+  if (!template) return null;
+  const span = max - min;
+  return template.map((z) => ({ color: z.color, endValue: min + z.endValue * span }));
+}
+
+function ColorBandEditor({ zones, min, max, position, thickness, onChangeZones, onChangePosition, onChangeThickness }) {
+  const span = Math.max(1e-9, max - min);
+  const updateZone = (i, patch) => {
+    const next = zones.map((z, idx) => (idx === i ? { ...z, ...patch } : z));
+    // Clamp endValues to [min, max] and force monotonic; the last stop snaps to max.
+    let last = min;
+    for (let j = 0; j < next.length; j++) {
+      let ev = Number(next[j].endValue);
+      if (!Number.isFinite(ev)) ev = last + span / next.length;
+      ev = Math.max(min, Math.min(max, ev));
+      if (ev <= last) ev = last + span / 1e6;
+      last = ev;
+      next[j] = { ...next[j], endValue: ev };
+    }
+    next[next.length - 1].endValue = max;
+    onChangeZones(next);
+  };
+  const removeZone = (i) => {
+    if (zones.length <= 1) return;
+    const next = zones.filter((_, idx) => idx !== i);
+    next[next.length - 1].endValue = max;
+    onChangeZones(next);
+  };
+  const addZone = () => {
+    if (zones.length >= MAX_ZONES) return;
+    // Split the last zone in half.
+    const lastIdx = zones.length - 1;
+    const prev = lastIdx === 0 ? min : zones[lastIdx - 1].endValue;
+    const mid = (prev + zones[lastIdx].endValue) / 2;
+    const next = [...zones];
+    next.splice(lastIdx, 0, { color: '#888888', endValue: mid });
+    onChangeZones(next);
+  };
+
+  return (
+    <>
+      <div className="row gap-top">
+        <label>Position</label>
+        <Seg
+          options={[{ value: 'outer', label: 'Outer' }, { value: 'inner', label: 'Inner' }]}
+          value={position}
+          onChange={onChangePosition}
+        />
+      </div>
+      <Slider label="Thickness" value={thickness} min={1} max={30} step={1} onChange={onChangeThickness} suffix="px" />
+
+      {/* Stacked proportional preview */}
+      <div className="band-preview" aria-hidden="true">
+        {zones.map((z, i) => {
+          const prev = i === 0 ? min : zones[i - 1].endValue;
+          const w = ((z.endValue - prev) / span) * 100;
+          return <div key={i} style={{ width: `${w}%`, background: z.color }} />;
+        })}
+      </div>
+
+      <div className="band-zones">
+        {zones.map((z, i) => (
+          <div key={i} className="band-zone-row">
+            <input
+              type="color"
+              className="band-swatch"
+              value={z.color}
+              onChange={(e) => updateZone(i, { color: e.target.value })}
+              aria-label={`Zone ${i + 1} colour`}
+            />
+            <input
+              type="number"
+              className="num mono band-end"
+              value={z.endValue}
+              step={1}
+              disabled={i === zones.length - 1}
+              title={i === zones.length - 1 ? 'Last zone always ends at max' : 'End value'}
+              onChange={(e) => updateZone(i, { endValue: Number(e.target.value) })}
+            />
+            <button
+              type="button"
+              className="band-del"
+              onClick={() => removeZone(i)}
+              disabled={zones.length <= 1}
+              aria-label={`Delete zone ${i + 1}`}
+              title="Delete zone"
+            >×</button>
+          </div>
+        ))}
+      </div>
+
+      <div className="btn-row gap-top-sm">
+        <button
+          className="preset-save full-row"
+          onClick={addZone}
+          disabled={zones.length >= MAX_ZONES}
+        >+ Add zone</button>
+      </div>
+
+      <div className="row gap-top">
+        <label>Preset</label>
+        <select
+          className="select mono"
+          value=""
+          onChange={(e) => {
+            const next = applyPreset(e.target.value, min, max);
+            if (next) onChangeZones(next);
+          }}
+        >
+          <option value="">Choose…</option>
+          {Object.keys(BAND_PRESETS).map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+      <p className="hint">Each zone ends at the value shown. The final zone always reaches the max — colours flow left to right. Bands sit beneath ticks and rim.</p>
+    </>
+  );
+}
+
 // Shape SVG icons for the segmented control
 const ShapeIcon = {
   straight: (on) => (
@@ -516,6 +660,46 @@ const ShapeIcon = {
   ),
 };
 
+// ---- Colour band helpers ----
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const MAX_ZONES = 6;
+function encodeZones(zones) {
+  if (!Array.isArray(zones)) return '';
+  return zones.map((z) => `${z.color}:${z.endValue}`).join(',');
+}
+function decodeZones(str) {
+  if (typeof str !== 'string' || !str) return null;
+  const parts = str.split(',').slice(0, MAX_ZONES);
+  const out = [];
+  for (const part of parts) {
+    const [c, v] = part.split(':');
+    const ev = Number(v);
+    if (!HEX_RE.test(c) || !Number.isFinite(ev)) return null;
+    out.push({ color: c.toLowerCase(), endValue: ev });
+  }
+  return out.length > 0 ? out : null;
+}
+// Ensure zones are valid + monotonically increasing within [min, max].
+function sanitizeZones(zones, min, max) {
+  if (!Array.isArray(zones) || zones.length === 0) return DEFAULTS.colorBandZones;
+  const out = [];
+  let last = -Infinity;
+  for (const z of zones.slice(0, MAX_ZONES)) {
+    const color = typeof z?.color === 'string' && HEX_RE.test(z.color) ? z.color.toLowerCase() : '#cccccc';
+    let ev = Number(z?.endValue);
+    if (!Number.isFinite(ev)) continue;
+    // Enforce strictly increasing and within [min, max]
+    ev = Math.max(min, Math.min(max, ev));
+    if (ev <= last) ev = last + (max - min) / 1e6; // nudge forward
+    last = ev;
+    out.push({ color, endValue: ev });
+  }
+  if (out.length === 0) return DEFAULTS.colorBandZones;
+  // Snap the final stop to max so the band always reaches the dial end.
+  out[out.length - 1].endValue = max;
+  return out;
+}
+
 // ---- URL state helpers ----
 // We round-trip only the fields that differ from DEFAULTS, using short keys,
 // so the hash stays as short as possible. Old base64-JSON URLs still decode
@@ -554,6 +738,10 @@ const HASH_KEYS = {
   pngScale: 'ps',
   fontFamily: 'ff',
   outlineOnExport: 'ote',
+  colorBandEnabled: 'cbe',
+  colorBandThickness: 'cbt',
+  colorBandPosition: 'cbp',
+  colorBandZones: 'cbz',
   startAngle: 'sa',
   sweepAngle: 'sw',
   tickDirection: 'td',
@@ -570,6 +758,13 @@ function encodeHashState(p, defaults) {
   const usp = new URLSearchParams();
   for (const [fullKey, shortKey] of Object.entries(HASH_KEYS)) {
     const v = p[fullKey];
+    if (Array.isArray(v)) {
+      // Compact `#rrggbb:value,#rrggbb:value` for the colour band zones.
+      const encoded = encodeZones(v);
+      const defaultEncoded = encodeZones(defaults[fullKey]);
+      if (encoded && encoded !== defaultEncoded) usp.set(shortKey, encoded);
+      continue;
+    }
     if (v === defaults[fullKey]) continue;
     if (typeof v === 'boolean') usp.set(shortKey, v ? '1' : '0');
     else usp.set(shortKey, String(v));
@@ -588,7 +783,10 @@ function decodeHashState(hash, defaults) {
       const fullKey = HASH_KEYS_INV[shortKey];
       if (!fullKey) continue;
       const defaultVal = defaults[fullKey];
-      if (typeof defaultVal === 'boolean') {
+      if (Array.isArray(defaultVal)) {
+        const parsed = decodeZones(value);
+        if (parsed) result[fullKey] = parsed;
+      } else if (typeof defaultVal === 'boolean') {
         // Only the strict '1' / '0' encoding maps to a boolean; anything
         // else stays unset so the DEFAULTS merge keeps the default value.
         if (value === '1') result[fullKey] = true;
@@ -1072,6 +1270,25 @@ export default function App() {
           </div>
           {p.rim && (
             <Slider label="Thickness" value={p.rimThickness} min={0.5} max={12} step={0.5} onChange={(v) => set('rimThickness', v)} suffix="px" />
+          )}
+        </Sec>
+
+        <Sec id="colorband" title="Colour band">
+          <div className="row">
+            <label>Show band</label>
+            <Toggle checked={p.colorBandEnabled} onChange={(v) => set('colorBandEnabled', v)} />
+          </div>
+          {p.colorBandEnabled && (
+            <ColorBandEditor
+              zones={p.colorBandZones}
+              min={p.min}
+              max={p.max}
+              position={p.colorBandPosition}
+              thickness={p.colorBandThickness}
+              onChangeZones={(zones) => set('colorBandZones', zones)}
+              onChangePosition={(v) => set('colorBandPosition', v)}
+              onChangeThickness={(v) => set('colorBandThickness', v)}
+            />
           )}
         </Sec>
 
