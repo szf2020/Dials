@@ -34,6 +34,7 @@ const DEFAULTS = {
   tickColor: '#111111',
   bg: '#ffffff',
   pngScale: 2,              // PNG export resolution multiplier
+  pngTransparent: false,    // force alpha-transparent PNG regardless of bg
   fontFamily: 'Helvetica, Arial, sans-serif',
   outlineOnExport: false,
   // Colour band (zone indicator)
@@ -267,7 +268,7 @@ function sanitizeParams(p) {
   // Booleans: accept strict true/false only. !!val would turn truthy-looking
   // strings like "false", "0", or "no" into true, so a hand-crafted preset
   // could silently flip toggles. Fall back to DEFAULTS on anything else.
-  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport', 'tickRoundBoth', 'colorBandEnabled']) {
+  for (const key of ['rim', 'showNumbers', 'invert', 'reverse', 'centerDot', 'outlineOnExport', 'tickRoundBoth', 'colorBandEnabled', 'pngTransparent']) {
     if (out[key] !== true && out[key] !== false) out[key] = DEFAULTS[key];
   }
 
@@ -736,6 +737,7 @@ const HASH_KEYS = {
   tickColor: 'tc',
   bg: 'bg',
   pngScale: 'ps',
+  pngTransparent: 'pt',
   fontFamily: 'ff',
   outlineOnExport: 'ote',
   colorBandEnabled: 'cbe',
@@ -1091,6 +1093,13 @@ export default function App() {
   const exportPNG = useCallback(async () => {
     const clone = await buildExportSvg();
     if (!clone) return;
+    const wantTransparent = params.pngTransparent || params.bg === 'transparent';
+    // If the user wants a transparent PNG but the dial has a solid background,
+    // strip the SVG's bg <rect> so the canvas's transparency comes through.
+    if (wantTransparent) {
+      const first = clone.firstElementChild;
+      if (first && first.tagName.toLowerCase() === 'rect') first.remove();
+    }
     const xml = serializeSvg(clone);
     const svg64 = btoa(unescape(encodeURIComponent(xml)));
     const img = new Image();
@@ -1100,7 +1109,7 @@ export default function App() {
       cnv.width = params.width * scale;
       cnv.height = params.height * scale;
       const ctx = cnv.getContext('2d');
-      if (params.bg === 'transparent') {
+      if (wantTransparent) {
         ctx.clearRect(0, 0, cnv.width, cnv.height);
       } else {
         ctx.fillStyle = params.bg || '#ffffff';
@@ -1424,6 +1433,10 @@ export default function App() {
               value={p.pngScale}
               onChange={(v) => set('pngScale', v)}
             />
+          </div>
+          <div className="row gap-top">
+            <label>Transparent PNG</label>
+            <Toggle checked={p.pngTransparent} onChange={(v) => set('pngTransparent', v)} />
           </div>
           <div className="row gap-top">
             <label>Outline text on export</label>
